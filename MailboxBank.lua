@@ -272,18 +272,18 @@ function MailboxBank_OnEvent(self, event, ...)
 		MailboxBank_Hide()
 	end
 	if event == "ADDON_LOADED" then
-		print("MailboxBank loaded")
+	--	print("MailboxBank loaded")
 	end
 	if event == "PLAYER_ENTERING_WORLD" then
 		MailboxBankFrame = MailboxBank_CreatFrame("MailboxBankFrame")
+		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
 end
 
 local MailboxBank_Event = CreateFrame("Frame")
-MailboxBank_Event:Hide()
-MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
 MailboxBank_Event:RegisterEvent("ADDON_LOADED")
 MailboxBank_Event:RegisterEvent("PLAYER_ENTERING_WORLD")
 MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 MailboxBank_Event:RegisterEvent("MAIL_SHOW")
 MailboxBank_Event:RegisterEvent("MAIL_CLOSED")
+MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
