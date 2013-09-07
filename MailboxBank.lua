@@ -1,6 +1,9 @@
+SLASH_MAILBOXBANK1 = "/mb";
+
 local E = unpack(ElvUI);
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
+local match = string.match
 local isStacked
 local checkMailTick
 local daysLeftYellow, daysLeftRed = 5, 3 --daysLeftYellow should greater than daysLeftRed
@@ -15,18 +18,19 @@ function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLef
 	item["daysLeft"] = daysLeft
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
-	item["wasReturned"] = wasReturned
+	--item["wasReturned"] = wasReturned
 	tinsert(MailboxBank_db, item)
+	MailboxBank_db.itemCount = MailboxBank_db.itemCount + 1
 end
 
 function MailboxBank_CheckMail()
-	checkMailTick = GetTime()
-	MailboxBank_db = {}
+	MailboxBank_db = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
 			local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
 			--if isGM ~= nil then print("GM@"..sender) end
+			if money > 0 then MailboxBank_db.money = MailboxBank_db.money + 1 end
 			if hasItem and CODAmount == 0 then
 				if sender == nil then
 					sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
@@ -43,6 +47,8 @@ function MailboxBank_CheckMail()
 			end
 		end
 	end
+	checkMailTick = time()
+	MailboxBank_db.checkMailTick = checkMailTick
 	--return true
 end
 
@@ -78,8 +84,8 @@ function MailboxBank_CreatFrame(name)
 	----Create check time text
 	f.checkTime = f:CreateFontString(nil, 'OVERLAY');
 	f.checkTime:FontTemplate()
-	f.checkTime:Point("TOPLEFT", 100, -8);
-	f.checkTime:SetText("計算距離上次更新時間");
+	f.checkTime:Point("TOPLEFT", 120, -10);
+	
 	----Create sort dropdown menu
 	--[[local chooseSortType = CreateFrame("Frame", f:GetName().."DropDown", f, "UIDropDownMenuTemplate")
 	chooseSortType:Point("TOPLEFT", 80, -6)
@@ -102,10 +108,16 @@ local MailboxBank_TooltipShow = function (self)
 		GameTooltip:SetHyperlink(self.link)
 		for i = 1 , getn(self.countnum)do
 			local lefttext = self.countnum[i].." 個,從"..self.sender[i]
-			local leftday = floor(self.dayleft[i])
-			local lefthour = floor((self.dayleft[i] - leftday)*24)
-			local leftminute = floor(((self.dayleft[i] - leftday)*24 - lefthour)*60)
-			local righttext = "剩餘"..tostring(leftday).."天"..tostring(lefthour).."小時"..tostring(leftminute).."分鐘"
+			local righttext = "剩餘 "
+			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
+			local leftday = floor(dayLeftTick / 86400)
+			if leftday > 0 then
+				righttext = righttext.."大於"..tostring(leftday).."天"
+			else
+				local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
+				local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
+				righttext = righttext..tostring(lefthour).."小時"..tostring(leftminute).."分鐘"
+			end
 			local rR, gR, bR
 			if leftday < daysLeftRed then
 				rR, gR, bR = 1, 0, 0
@@ -139,10 +151,10 @@ function MailboxBank_UpdateContainer()
 	local numContainerRows = 0;
 	local stackon = nil
 	local sorted_db = MailboxBank_db
-	local numItems = getn(sorted_db)
+	local numItems = sorted_db.itemCount
 	local containerID = 1
 	f.totalSlots = 0;
-	
+	f.checkTime:SetText(floor(difftime(time(),sorted_db.checkMailTick)/60).." 分鐘前掃描" or "");
 	if numItems > 0 then
 		if not f.Container[containerID] then
 			f.Container[containerID] = CreateFrame('Frame', f:GetName()..'Container'..containerID, f);
@@ -163,7 +175,7 @@ function MailboxBank_UpdateContainer()
 			local slot
 			if isStacked then
 				for i = 1, usedSlot do
-					if select(1,GetItemInfo(f.Container[containerID][i].link)) == select(1,GetItemInfo(sorted_db[itemID].itemLink)) then
+					if tonumber(match(f.Container[containerID][i].link, "item:(%d+)")) == tonumber(match(sorted_db[itemID].itemLink, "item:(%d+)")) then
 						slot = f.Container[containerID][i]
 						stackon = i
 					end
@@ -183,6 +195,7 @@ function MailboxBank_UpdateContainer()
 				slot:Size(buttonSize);
 				
 				slot.count = slot:CreateFontString(nil, 'OVERLAY');
+				slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
 				slot.count:FontTemplate()
 				slot.count:Point('BOTTOMRIGHT', 0, 2);
 				
@@ -197,26 +210,14 @@ function MailboxBank_UpdateContainer()
 					GameTooltip:Hide()
 				end)
 				
-				if lastButton then
-					if (f.totalSlots - 1) % numContainerColumns == 0 then
-						slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -buttonSpacing);
-						lastRowButton = slot;
-						numContainerRows = numContainerRows + 1;
-					else
-						slot:Point('LEFT', lastButton, 'RIGHT', buttonSpacing, 0);
-					end
-				else
-					slot:Point('TOPLEFT', f, 'TOPLEFT', leftOffset, -topOffset);
-					lastRowButton = slot;
-					numContainerRows = numContainerRows + 1;
-				end
-				lastButton = slot;
+
 				
 				f.Container[containerID][f.Container[containerID].numSlots] = slot
 			end
 			
 			if stackon == nil then
 				slot.link = sorted_db[itemID].itemLink
+				slot.checkMailTick = sorted_db.checkMailTick
 				slot.sender = {}
 				slot.dayleft = {}
 				slot.countnum = {}
@@ -243,7 +244,22 @@ function MailboxBank_UpdateContainer()
 				countnum = countnum + slot.countnum[i]
 			end
 			slot.count:SetText(countnum > 1 and countnum or '');
-			
+			if stackon == nil then
+				if lastButton then
+					if (usedSlot - 1) % numContainerColumns == 0 then
+						slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -buttonSpacing);
+						lastRowButton = f.Container[containerID][usedSlot];
+						numContainerRows = numContainerRows + 1;
+					else
+						slot:Point('LEFT', lastButton, 'RIGHT', buttonSpacing, 0);
+					end
+				else
+					slot:Point('TOPLEFT', f, 'TOPLEFT', leftOffset, -topOffset);
+					lastRowButton = f.Container[containerID][usedSlot];
+					numContainerRows = numContainerRows + 1;
+				end
+				lastButton = f.Container[containerID][usedSlot];
+			end
 			stackon = nil
 		end
 	end
@@ -287,3 +303,12 @@ MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 MailboxBank_Event:RegisterEvent("MAIL_SHOW")
 MailboxBank_Event:RegisterEvent("MAIL_CLOSED")
 MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
+
+SlashCmdList["MAILBOXBANK"] = function(msg)
+	if MailboxBankFrame:IsVisible() then
+		MailboxBank_Hide()
+	else
+		MailboxBank_UpdateContainer()
+		MailboxBank_Show()
+	end
+end;
