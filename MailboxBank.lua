@@ -54,6 +54,10 @@ end
 
 
 ---- GUI ----
+function MailboxBank_ScrollBarUpdate()
+
+end
+
 function MailboxBank_CreatFrame(name)
 	----Create mailbox bank frame
 	local f = CreateFrame("Button", name, UIParent)
@@ -65,8 +69,12 @@ function MailboxBank_CreatFrame(name)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:RegisterForClicks("AnyUp");
-	f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-	f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+	f:SetScript("OnDragStart", function(self)
+		self:StartMoving()
+	end)
+	f:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+	end)
 	f:Hide()
 	
 	----Create close button
@@ -78,7 +86,10 @@ function MailboxBank_CreatFrame(name)
 	f.checkButton = CreateFrame("CheckButton", name.."CheckButton", f, "UICheckButtonTemplate");
 	f.checkButton:Point("TOPLEFT", 2, -2)
 	f.checkButton.text:SetText("堆疊物品")
-	f.checkButton:SetScript("OnClick", function(self) isStacked = self:GetChecked() MailboxBank_UpdateContainer() end)
+	f.checkButton:SetScript("OnClick", function(self)
+		isStacked = self:GetChecked()
+		MailboxBank_UpdateContainer()
+	end)
 	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
 	
 	----Create check time text
@@ -87,17 +98,28 @@ function MailboxBank_CreatFrame(name)
 	f.checkTime:Point("TOPLEFT", 120, -10);
 	
 	----Create sort dropdown menu
-	--[[local chooseSortType = CreateFrame("Frame", f:GetName().."DropDown", f, "UIDropDownMenuTemplate")
-	chooseSortType:Point("TOPLEFT", 80, -6)
-	E.Skins:HandleDropDownBox(chooseSortType, 180)
-	f.chooseSortType = chooseSortType
-	UIDropDownMenu_Initialize(chooseSortType, ChooseSortType_Initialize);]]
+	--[[local f.dropDownMenu = CreateFrame("Frame", f:GetName().."DropDown", f, "UIDropDownMenuTemplate")
+	f.dropDownMenu:Point("TOPLEFT", 80, -6)
+	E.Skins:HandleDropDownBox(f.dropDownMenu, 180)
+	UIDropDownMenu_Initialize(f.dropDownMenu, MailboxBank_DropDownMenuInitialize);]]
+	
+	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
+	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
+	f.scrollBar:SetPoint("BOTTOMRIGHT", -30, 8)
+	f.scrollBar:Hide()
+	f.scrollBar:SetScript("OnVerticalScroll", function() 
+		FauxScrollFrame_OnVerticalScroll(self, offset, 16, MailboxBank_ScrollBarUpdate());
+	end)
+	f.scrollBar:SetScript("OnShow", function()
+		MailboxBank_ScrollBarUpdate()
+	end)
+	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
 	f.Container = {}
 	return f
 end
 
-local MailboxBank_TooltipShow = function (self)
+function MailboxBank_TooltipShow(self)
 	if self and self.link then
 		local x = self:GetRight();
 		if ( x >= ( GetScreenWidth() / 2 ) ) then
@@ -106,37 +128,71 @@ local MailboxBank_TooltipShow = function (self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 		end
 		GameTooltip:SetHyperlink(self.link)
-		for i = 1 , getn(self.countnum)do
-			local lefttext = self.countnum[i].." 個,從"..self.sender[i]
-			local righttext = "剩餘 "
+		
+		local formatList = {}
+		for i = 1 , getn(self.countnum) do
+			if formatList[self.sender[i]] == nil then
+				formatList[self.sender[i]] = {}
+				local row = {}
+				row.lefttext = "發件人: "..self.sender[i]
+				row.righttext = 0
+				tinsert(formatList[self.sender[i]], row)
+			end
+			
+			local lefttext = "+ 剩餘 "
 			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
 			local leftday = floor(dayLeftTick / 86400)
 			if leftday > 0 then
-				righttext = righttext.."大於"..tostring(leftday).."天"
+				lefttext = lefttext.."大於"..tostring(leftday).."天"
 			else
 				local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
 				local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-				righttext = righttext..tostring(lefthour).."小時"..tostring(leftminute).."分鐘"
+				lefttext = lefttext..tostring(lefthour).."小時"..tostring(leftminute).."分鐘"
 			end
-			local rR, gR, bR
-			if leftday < daysLeftRed then
-				rR, gR, bR = 1, 0, 0
-			elseif leftday < daysLeftYellow then
-				rR, gR, bR = 1, 1, 0
-			else
-				rR, gR, bR = 0, 1, 0
+			
+			local foundSameLefttime = false
+			for j = 1, getn(formatList[self.sender[i]]) do
+				if formatList[self.sender[i]][j].lefttext == lefttext then
+					formatList[self.sender[i]][j].righttext = formatList[self.sender[i]][j].righttext + self.countnum[i]
+					formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countnum[i]
+					foundSameLefttime = true
+				end
 			end
-			GameTooltip:AddDoubleLine(lefttext, righttext, 1, 1, 1, rR, gR, bR)
+			
+			if foundSameLefttime == false then
+				local row = {}
+				row.lefttext = lefttext
+				row.righttext = self.countnum[i]
+				row.leftday = leftday
+				formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countnum[i]
+				tinsert(formatList[self.sender[i]], row)
+			end
 		end
 
+		for k in pairs(formatList) do
+			for i = 1, getn(formatList[k]) do
+				local rL, gL, bL = 1, 1, 1
+				if i > 1 then
+					local leftday = formatList[k][i].leftday
+					if leftday < daysLeftRed then
+						rL, gL, bL = 1, 0, 0
+					elseif leftday < daysLeftYellow then
+						rL, gL, bL = 1, 1, 0
+					else
+						rL, gL, bL = 0, 1, 0
+					end
+				end
+				GameTooltip:AddDoubleLine(formatList[k][i].lefttext, formatList[k][i].righttext, rL, gL, bL)
+			end
+		end
+		
 		GameTooltip:Show()
 	end
 end
 
---[[local MailboxBank_SlotClick = function (self)
+--[[function MailboxBank_SlotClick(self)
 	
 end]]
-
 
 function MailboxBank_UpdateContainer()
 	local f = MailboxBankFrame
@@ -167,7 +223,6 @@ function MailboxBank_UpdateContainer()
 					f.Container[containerID][i]:Hide()
 				end
 			end
-			
 		end
 		
 		local usedSlot = 0
@@ -204,13 +259,13 @@ function MailboxBank_UpdateContainer()
 				slot.tex:Point("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
 				slot.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
 				
-				slot:SetScript("OnEnter", MailboxBank_TooltipShow)
-				--slot:HookScript("OnClick", MailboxBank_SlotClick)
-				slot:SetScript("OnLeave", function(self)
+				slot:SetScript("OnEnter", function(self)
+					MailboxBank_TooltipShow(self)
+				end)
+				--slot:HookScript("OnClick", function(self) MailboxBank_SlotClick(self) end)
+				slot:SetScript("OnLeave", function()
 					GameTooltip:Hide()
 				end)
-				
-
 				
 				f.Container[containerID][f.Container[containerID].numSlots] = slot
 			end
@@ -235,10 +290,11 @@ function MailboxBank_UpdateContainer()
 				else
 					slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
 				end
+				slot.tex:SetTexture(slot.texture)
 			else
 				slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
 			end
-			slot.tex:SetTexture(slot.texture)
+			
 			local countnum = 0
 			for i = 1 , getn(slot.countnum) do
 				countnum = countnum + slot.countnum[i]
