@@ -1,12 +1,14 @@
 SLASH_MAILBOXBANK1 = "/mb";
 
-local E = unpack(ElvUI);
+local E, L, V, P, G, _ = unpack(ElvUI); --Inport: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local match = string.match
 local isStacked
 local checkMailTick
 local daysLeftYellow, daysLeftRed = 5, 3 --daysLeftYellow should greater than daysLeftRed
+local playername = E.myname..'-'..E.myrealm
+local selectValue = playername
 
 function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
 	local item = {}
@@ -19,18 +21,18 @@ function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLef
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
 	--item["wasReturned"] = wasReturned
-	tinsert(MailboxBank_db, item)
-	MailboxBank_db.itemCount = MailboxBank_db.itemCount + 1
+	tinsert(MailboxBank_db[playername], item)
+	MailboxBank_db[playername].itemCount = MailboxBank_db[playername].itemCount + 1
 end
 
 function MailboxBank_CheckMail()
-	MailboxBank_db = {itemCount = 0, money = 0}
+	MailboxBank_db[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
 			local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
 			--if isGM ~= nil then print("GM@"..sender) end
-			if money > 0 then MailboxBank_db.money = MailboxBank_db.money + 1 end
+			if money > 0 then MailboxBank_db[playername].money = MailboxBank_db[playername].money + money end
 			if hasItem and CODAmount == 0 then
 				if sender == nil then
 					sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
@@ -40,7 +42,7 @@ function MailboxBank_CheckMail()
 				for itemIndex = 1, hasItem do
 					local name, itemTexture, count, quality, canUse = GetInboxItem(mailIndex, itemIndex)
 					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
-					if name ~= nil then
+					if name ~= nil and itemLink ~= nil then
 						MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
 					end
 				end
@@ -48,12 +50,40 @@ function MailboxBank_CheckMail()
 		end
 	end
 	checkMailTick = time()
-	MailboxBank_db.checkMailTick = checkMailTick
+	MailboxBank_db[playername].checkMailTick = checkMailTick
 	--return true
 end
 
+local function ChooseChar_OnClick(self)
+	MailboxBank_UpdateContainer()
+	selectValue = self.value
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
+
+	local text = MailboxBankFrameDropDownText;
+	local width = text:GetStringWidth();
+	MailboxBankFrameDropDown:SetWidth(width+60)	
+end
 
 ---- GUI ----
+function MailboxBank_DropDownMenuInitialize()
+	local info = UIDropDownMenu_CreateInfo();
+	
+	for k, v in pairs(MailboxBank_db) do
+		if type(k) == 'string' and v then
+			info = UIDropDownMenu_CreateInfo()
+			info.text = k
+			info.value = k
+			info.func = ChooseChar_OnClick;
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+	
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, selectValue);
+	local text = MailboxBankFrameDropDownText;
+	local width = text:GetStringWidth();
+	MailboxBankFrameDropDown:SetWidth(width+60)
+end
+
 function MailboxBank_ScrollBarUpdate()
 
 end
@@ -93,10 +123,18 @@ function MailboxBank_CreatFrame(name)
 	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
 	
 	----Create check time text
-	f.checkTime = f:CreateFontString(nil, 'OVERLAY');
-	f.checkTime:FontTemplate()
-	f.checkTime:Point("TOPLEFT", 120, -10);
+	f.mailboxGold = f:CreateFontString(nil, 'OVERLAY');
+	f.mailboxGold:FontTemplate()
+	f.mailboxGold:Point("BOTTOMLEFT", 20, 5);
 	
+	tinsert(UISpecialFrames, f:GetName())
+	local chooseChar = CreateFrame('Frame', f:GetName()..'DropDown', f, 'UIDropDownMenuTemplate')
+	chooseChar:Point("TOPLEFT", 80, -6)
+	E.Skins:HandleDropDownBox(chooseChar, 180)
+	f.chooseChar = chooseChar
+	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
+
+		
 	----Create sort dropdown menu
 	--[[local f.dropDownMenu = CreateFrame("Frame", f:GetName().."DropDown", f, "UIDropDownMenuTemplate")
 	f.dropDownMenu:Point("TOPLEFT", 80, -6)
@@ -207,10 +245,12 @@ function MailboxBank_UpdateContainer()
 	local numContainerRows = 0;
 	local stackon = nil
 	local sorted_db = MailboxBank_db
-	local numItems = sorted_db.itemCount
+	local playername = selectValue
+	local numItems = sorted_db[playername].itemCount
 	local containerID = 1
 	f.totalSlots = 0;
-	f.checkTime:SetText(floor(difftime(time(),sorted_db.checkMailTick)/60).." 分鐘前掃描" or "");
+	f.mailboxGold:SetText("郵箱金幣: "..(sorted_db[playername].money / 10000).." G")
+	--f.mailboxGold:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
 	if numItems > 0 then
 		if not f.Container[containerID] then
 			f.Container[containerID] = CreateFrame('Frame', f:GetName()..'Container'..containerID, f);
@@ -230,7 +270,7 @@ function MailboxBank_UpdateContainer()
 			local slot
 			if isStacked then
 				for i = 1, usedSlot do
-					if tonumber(match(f.Container[containerID][i].link, "item:(%d+)")) == tonumber(match(sorted_db[itemID].itemLink, "item:(%d+)")) then
+					if tonumber(match(f.Container[containerID][i].link, "item:(%d+)")) == tonumber(match(sorted_db[playername][itemID].itemLink, "item:(%d+)")) then
 						slot = f.Container[containerID][i]
 						stackon = i
 					end
@@ -271,15 +311,15 @@ function MailboxBank_UpdateContainer()
 			end
 			
 			if stackon == nil then
-				slot.link = sorted_db[itemID].itemLink
-				slot.checkMailTick = sorted_db.checkMailTick
+				slot.link = sorted_db[playername][itemID].itemLink
+				slot.checkMailTick = sorted_db[playername].checkMailTick
 				slot.sender = {}
 				slot.dayleft = {}
 				slot.countnum = {}
 			end
-			tinsert(slot.sender , sorted_db[itemID].sender)
-			tinsert(slot.dayleft , sorted_db[itemID].daysLeft)
-			tinsert(slot.countnum , sorted_db[itemID].count)
+			tinsert(slot.sender , sorted_db[playername][itemID].sender)
+			tinsert(slot.dayleft , sorted_db[playername][itemID].daysLeft)
+			tinsert(slot.countnum , sorted_db[playername][itemID].count)
 			
 			slot:Show()
 			if slot.link then
