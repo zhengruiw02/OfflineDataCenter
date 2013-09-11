@@ -1,14 +1,23 @@
-SLASH_MAILBOXBANK1 = "/mb";
-
 local E, L, V, P, G, _ = unpack(ElvUI); --Inport: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local match = string.match
 local isStacked
 local checkMailTick
-local daysLeftYellow, daysLeftRed = 5, 3 --daysLeftYellow should greater than daysLeftRed
+--local daysLeftYellow, daysLeftRed = 5, 3 --daysLeftYellow should greater than daysLeftRed
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
+
+MailboxBank_db = {
+	daysLeftYellow = 5,
+	daysLeftRed = 3,
+	buttonSize = 36,
+	buttonSpacing = 4,
+	topOffset = 40,
+	leftOffset = 8,
+	frameWidth = 330,
+	frameHeight = 500,
+}	
 
 function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
 	local item = {}
@@ -42,7 +51,7 @@ function MailboxBank_CheckMail()
 				for itemIndex = 1, hasItem do
 					local name, itemTexture, count, quality, canUse = GetInboxItem(mailIndex, itemIndex)
 					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
-					if name ~= nil and itemLink ~= nil then
+					if name and itemLink then
 						MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
 					end
 				end
@@ -55,7 +64,7 @@ function MailboxBank_CheckMail()
 end
 
 local function ChooseChar_OnClick(self)
-	MailboxBank_UpdateContainer()
+	MailboxBank_UpdateContainer(self.value)
 	selectValue = self.value
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
 
@@ -69,7 +78,7 @@ function MailboxBank_DropDownMenuInitialize()
 	local info = UIDropDownMenu_CreateInfo();
 	
 	for k, v in pairs(MailboxBank_db) do
-		if type(k) == 'string' and v then
+		if type(k) == 'string' and type(v) == 'table' then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = k
 			info.value = k
@@ -93,8 +102,8 @@ function MailboxBank_CreatFrame(name)
 	local f = CreateFrame("Button", name, UIParent)
 	f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
 	f:SetFrameStrata("DIALOG");
-	f:SetWidth(333)
-	f:SetHeight(500)
+	f:SetWidth(MailboxBank_db.frameWidth)
+	f:SetHeight(MailboxBank_db.frameHeight)
 	f:SetPoint("CENTER",0,0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
@@ -118,7 +127,7 @@ function MailboxBank_CreatFrame(name)
 	f.checkButton.text:SetText("堆疊物品")
 	f.checkButton:SetScript("OnClick", function(self)
 		isStacked = self:GetChecked()
-		MailboxBank_UpdateContainer()
+		MailboxBank_UpdateContainer(playername)
 	end)
 	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
 	
@@ -212,9 +221,9 @@ function MailboxBank_TooltipShow(self)
 				local rL, gL, bL = 1, 1, 1
 				if i > 1 then
 					local leftday = formatList[k][i].leftday
-					if leftday < daysLeftRed then
+					if leftday < MailboxBank_db.daysLeftRed then
 						rL, gL, bL = 1, 0, 0
-					elseif leftday < daysLeftYellow then
+					elseif leftday < MailboxBank_db.daysLeftYellow then
 						rL, gL, bL = 1, 1, 0
 					else
 						rL, gL, bL = 0, 1, 0
@@ -232,20 +241,21 @@ end
 	
 end]]
 
-function MailboxBank_UpdateContainer()
-	local f = MailboxBankFrame
-	local buttonSize = 36
-	local buttonSpacing = 4
+function MailboxBank_UpdateContainer(playername)
+	local f = MailboxBankFrame or MailboxBank_CreatFrame("MailboxBankFrame");
+	
+	local sorted_db = MailboxBank_db
+	local buttonSize = sorted_db.buttonSize
+	local buttonSpacing = sorted_db.buttonSpacing
 	local containerWidth = f:GetWidth()
-	local topOffset = 40
-	local leftOffset = 8
+	local topOffset = sorted_db.topOffset
+	local leftOffset = sorted_db.leftOffset
 	local numContainerColumns = floor(containerWidth / (buttonSize + buttonSpacing));
 	local lastButton;
 	local lastRowButton;
 	local numContainerRows = 0;
-	local stackon = nil
-	local sorted_db = MailboxBank_db
-	local playername = selectValue
+	local stackon
+--	local playername = selectValue
 	local numItems = sorted_db[playername].itemCount
 	local containerID = 1
 	f.totalSlots = 0;
@@ -318,7 +328,7 @@ function MailboxBank_UpdateContainer()
 				f.Container[containerID][f.Container[containerID].numSlots] = slot
 			end
 			
-			if stackon == nil then
+			if not stackon then
 				slot.link = sorted_db[playername][itemID].itemLink
 				slot.checkMailTick = sorted_db[playername].checkMailTick
 				slot.sender = {}
@@ -348,7 +358,7 @@ function MailboxBank_UpdateContainer()
 				countnum = countnum + slot.countnum[i]
 			end
 			slot.count:SetText(countnum > 1 and countnum or '');
-			if stackon == nil then
+			if not stackon then
 				if lastButton then
 					if (usedSlot - 1) % numContainerColumns == 0 then
 						slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -buttonSpacing);
@@ -371,6 +381,7 @@ end
 
 ---- Event ----
 function MailboxBank_Show()
+	selectValue = playername;
 	MailboxBankFrame:Show()
 end
 
@@ -381,12 +392,11 @@ end
 function MailboxBank_OnEvent(self, event, ...)
 	if event == "MAIL_INBOX_UPDATE" then
 		MailboxBank_CheckMail()
-		MailboxBank_UpdateContainer()
+		MailboxBank_UpdateContainer(playername)
 	end
 	if event == "MAIL_SHOW" then
 		--if MailboxBankFrame == nil then MailboxBankFrame = MailboxBank_CreatFrame("MailboxBankFrame") end
-		if MailboxBankFrame:IsVisible() then return end
-		MailboxBank_Show()
+		if not MailboxBankFrame:IsVisible() then MailboxBank_Show(); end
 	end
 	if event == "MAIL_CLOSED" then
 		MailboxBank_Hide()
@@ -408,11 +418,13 @@ MailboxBank_Event:RegisterEvent("MAIL_SHOW")
 MailboxBank_Event:RegisterEvent("MAIL_CLOSED")
 MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
 
-SlashCmdList["MAILBOXBANK"] = function(msg)
-	if MailboxBankFrame:IsVisible() then
+SLASH_MAILBOXBANK1 = "/mb";
+SLASH_MAILBOXBANK2 = "/mailbox";
+SlashCmdList["MAILBOXBANK"] = function()
+	if MailboxBankFrame and MailboxBankFrame:IsVisible() then
 		MailboxBank_Hide()
 	else
-		MailboxBank_UpdateContainer()
+		MailboxBank_UpdateContainer(playername)
 		MailboxBank_Show()
 	end
 end;
