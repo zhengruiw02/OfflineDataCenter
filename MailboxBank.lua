@@ -249,6 +249,14 @@ function MailboxBank_UpdateContainer()
 	local numItems = sorted_db[playername].itemCount
 	local containerID = 1
 	f.totalSlots = 0;
+	
+	--Hide all slot
+	for k, v in pairs(f.Container[containerID]) do
+		if v then
+			v:Hide()
+		end
+	end
+	
 	f.mailboxGold:SetText("郵箱金幣: "..(sorted_db[playername].money / 10000).." G")
 	--f.mailboxGold:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
 	if numItems > 0 then
@@ -257,12 +265,12 @@ function MailboxBank_UpdateContainer()
 			f.Container[containerID]:SetID(containerID);
 			f.Container[containerID]:Show()
 			f.Container[containerID].numSlots = 0;
-		else
-			for i = 1, f.Container[containerID].numSlots do
-				if f.Container[containerID][i] then
-					f.Container[containerID][i]:Hide()
-				end
-			end
+	--	else
+	--		for i = 1, f.Container[containerID].numSlots do
+	--			if f.Container[containerID][i] then
+	--				f.Container[containerID][i]:Hide()
+	--			end
+	--		end
 		end
 		
 		local usedSlot = 0
