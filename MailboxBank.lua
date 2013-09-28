@@ -8,7 +8,8 @@ local isMailShow = false
 local checkMailTick
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
-local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 5, 40
+local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 40
+local SlotDB
 
 local MailboxBank_config_init = {
 	daysLeftYellow = 5,
@@ -212,14 +213,30 @@ function MailboxBank_CreatFrame(name)
 	
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
-	f.scrollBar:SetPoint("BOTTOMRIGHT", -30, 8)
+	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 8)
 	f.scrollBar:Hide()
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset) 
-		FauxScrollFrame_OnVerticalScroll(self, offset, 16, MailboxBank_UpdateContainer(selectValue));
+	print("1 "..offset)
+		FauxScrollFrame_OnVerticalScroll(self, offset, 16, MailboxBank_UpdateContainer(selectValue,offset));
+		print("2 "..offset)
 	end)
 	f.scrollBar:SetScript("OnShow", function()
 		MailboxBank_UpdateContainer(selectValue)
 	end)
+	--[[f.scrollBar:EnableMouseWheel(true)
+	f.scrollBar:SetScript("OnMouseWheel", function(self, delta)
+      local current = f.scrollBar:GetValue()
+       
+      if IsShiftKeyDown() and (delta > 0) then
+         f.scrollBar:SetValue(0)
+      elseif IsShiftKeyDown() and (delta < 0) then
+         f.scrollBar:SetValue(scrollMax)
+      elseif (delta < 0) and (current < scrollMax) then
+         f.scrollBar:SetValue(current + 20)
+      elseif (delta > 0) and (current > 1) then
+         f.scrollBar:SetValue(current - 20)
+      end
+end)]]
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
 	local containerID = 1
@@ -227,6 +244,8 @@ function MailboxBank_CreatFrame(name)
 	f.Container[containerID] = CreateFrame('Frame', f:GetName()..'Container'..containerID, f);
 	f.Container[containerID]:SetID(containerID);
 	f.Container[containerID]:Show()
+	
+	--f.scrollBar:SetScrollChild(f.Container[containerID])
 	--f.Container[containerID].numSlots = 0;
 	
 	---- MUST TO ADJUST AS CONST ? ---
@@ -259,7 +278,9 @@ function MailboxBank_CreatFrame(name)
 		slot:SetScript("OnEnter", function(self)
 			MailboxBank_TooltipShow(self)
 		end)
-		slot:HookScript("OnClick", function(self,button) MailboxBank_SlotClick(self,button) end)
+		slot:HookScript("OnClick", function(self,button)
+			MailboxBank_SlotClick(self,button)
+		end)
 		slot:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
@@ -382,15 +403,15 @@ function MailboxBank_SlotClick(self,button)
 	end]]
 end
 
-function MailboxBank_UpdateContainer(playername)
+function MailboxBank_UpdateContainer(playername,offset)
 	local buttonSize = MailboxBank_config.buttonSize
 	local buttonSpacing = MailboxBank_config.buttonSpacing
 	
-	local f = MailboxBankFrame or MailboxBank_CreatFrame("MailboxBankFrame");
+	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
 	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MailboxBank_db[playername].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
 --	local playername = selectValue
-	local SlotDB = MailboxBank_SortDB(MailboxBank_db, playername, isStacked)
+	SlotDB = MailboxBank_SortDB(MailboxBank_db, playername, isStacked)
 	local usedSlot = SlotDB.usedSlot
 	local containerID = 1
 	
@@ -400,20 +421,26 @@ function MailboxBank_UpdateContainer(playername)
 	else
 		f.scrollBar:Hide();
 	end
-	FauxScrollFrame_Update(f.scrollBar, ceil(usedSlot / NUM_BAGITEMS_PER_ROW) , NUM_BAGITEMS_ROWS, buttonSize + buttonSpacing );
 	
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
-	
+	print("ScrollBar offset: "..offset)
+
 	for i = 1, BAGITEMS_ICON_DISPLAYED do
 		if f.Container[containerID][i] then
 			f.Container[containerID][i]:Hide()
 		end
 	end
-	
+	FauxScrollFrame_Update(f.scrollBar, ceil(usedSlot / NUM_BAGITEMS_PER_ROW) , NUM_BAGITEMS_ROWS, buttonSize + buttonSpacing );
 	--FauxScrollFrame_Update(f.scrollBar, usedSlot, MAX_ROWS or 10, buttonSize + buttonSpacing)
 
+	local iconDisplayCount
+	if (usedSlot - offset * 8) > BAGITEMS_ICON_DISPLAYED then
+		iconDisplayCount = BAGITEMS_ICON_DISPLAYED
+	else
+		iconDisplayCount = usedSlot - offset * 8
+	end
 	
-	for i = 1, BAGITEMS_ICON_DISPLAYED do
+	for i = 1, iconDisplayCount do
 		local itemID = i + offset * 8
 		
 		slot = f.Container[containerID][i]
