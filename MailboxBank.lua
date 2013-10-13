@@ -8,7 +8,7 @@ local isMailShow = false
 local checkMailTick
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
-local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 40
+local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 80
 local SlotDB
 
 local MailboxBank_config_init = {
@@ -100,6 +100,7 @@ function FormatMoney(money)
 end
 
 function MailboxBank_SortDB(oriDB, player, isStacked)
+
 	local numItems = oriDB[player].itemCount
 	local usedSlot = 0
 	local slotDB = {}
@@ -122,6 +123,10 @@ function MailboxBank_SortDB(oriDB, player, isStacked)
 			slot.sender = {}
 			slot.dayLeft = {}
 			slot.countNum = {}
+			if player == playername and not isStacked then
+				slot.mailIndex = oriDB[player][itemID].mailIndex
+				slot.itemIndex = oriDB[player][itemID].itemIndex
+			end
 		end
 		
 		tinsert(slot.sender , oriDB[player][itemID].sender)
@@ -216,9 +221,9 @@ function MailboxBank_CreatFrame(name)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 8)
 	f.scrollBar:Hide()
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset) 
-	print("1 "..offset)
+	--print("1 "..offset)
 		FauxScrollFrame_OnVerticalScroll(self, offset, 16, MailboxBank_UpdateContainer(selectValue,offset));
-		print("2 "..offset)
+		--print("2 "..offset)
 	end)
 	f.scrollBar:SetScript("OnShow", function()
 		MailboxBank_UpdateContainer(selectValue)
@@ -261,6 +266,7 @@ end)]]
 	local lastRowButton;
 	for i = 1, BAGITEMS_ICON_DISPLAYED do
 		local slot = CreateFrame('Button', f:GetName()..'Container'..containerID..'Slot'..i, f.Container[containerID]);
+		slot:Hide()
 		slot:SetTemplate('Default');
 		slot:StyleButton();
 		slot:Size(MailboxBank_config.buttonSize);
@@ -395,35 +401,35 @@ function MailboxBank_SlotClick(self,button)
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
+	elseif button == 'LeftButton' then
+		if self.mailIndex and self.itemIndex then
+			TakeInboxItem(self.mailIndex, self.itemIndex)
+		end
 	end
-	--[[if isMailShow == true and not isStacked then
-		MailboxBank_db[playername].mailIndex
-		MailboxBank_db[playername].itemIndex
-		TakeInboxItem()
-	end]]
+
 end
 
 function MailboxBank_UpdateContainer(playername,offset)
 	local buttonSize = MailboxBank_config.buttonSize
 	local buttonSpacing = MailboxBank_config.buttonSpacing
-	
 	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
 	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MailboxBank_db[playername].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
 --	local playername = selectValue
+
 	SlotDB = MailboxBank_SortDB(MailboxBank_db, playername, isStacked)
 	local usedSlot = SlotDB.usedSlot
 	local containerID = 1
-	
+
 	--scrollbar!!!
 	if ( usedSlot > BAGITEMS_ICON_DISPLAYED) then
 		f.scrollBar:Show();
 	else
 		f.scrollBar:Hide();
 	end
-	
+
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
-	print("ScrollBar offset: "..offset)
+	--print("ScrollBar offset: "..offset)
 
 	for i = 1, BAGITEMS_ICON_DISPLAYED do
 		if f.Container[containerID][i] then
@@ -450,6 +456,12 @@ function MailboxBank_UpdateContainer(playername,offset)
 		slot.dayleft = SlotDB[itemID].dayLeft
 		slot.countnum = SlotDB[itemID].countNum
 		
+		if SlotDB[itemID].mailIndex and SlotDB[itemID].itemIndex then
+			--print()
+			slot.mailIndex = SlotDB[itemID].mailIndex
+			slot.itemIndex = SlotDB[itemID].itemIndex
+		end
+		
 		if slot.link then
 			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
 			if slot.rarity and slot.rarity > 1 then
@@ -468,11 +480,8 @@ function MailboxBank_UpdateContainer(playername,offset)
 			countnum = countnum + slot.countnum[i]
 		end
 		slot.count:SetText(countnum > 1 and countnum or '');
-		
 		slot:Show()
-
 	end
-	
 end
 
 ---- Event ----
