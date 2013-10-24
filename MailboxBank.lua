@@ -8,7 +8,7 @@ local isMailShow = false
 local checkMailTick
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
-local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 80
+--local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 80
 local SlotDB
 
 local MailboxBank_config_init = {
@@ -16,6 +16,9 @@ local MailboxBank_config_init = {
 	daysLeftRed = 3,
 	buttonSize = 36,
 	buttonSpacing = 4,
+	numItemsPerRow = 8,
+	numItemsRows = 10,
+	itemsSlotDisplay = 80,
 	topOffset = 40,
 	leftOffset = 8,
 	frameWidth = 350,
@@ -37,18 +40,18 @@ function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLef
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
 	--item["wasReturned"] = wasReturned
-	tinsert(MailboxBank_db[playername], item)
-	MailboxBank_db[playername].itemCount = MailboxBank_db[playername].itemCount + 1
+	tinsert(MB_DB[playername], item)
+	MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
 end
 
 function MailboxBank_CheckMail()
-	MailboxBank_db[playername] = {itemCount = 0, money = 0}
+	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
 			local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
 			--if isGM ~= nil then print("GM@"..sender) end
-			if money > 0 then MailboxBank_db[playername].money = MailboxBank_db[playername].money + money end
+			if money > 0 then MB_DB[playername].money = MB_DB[playername].money + money end
 			if hasItem and CODAmount == 0 then
 				if sender == nil then
 					sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
@@ -66,7 +69,7 @@ function MailboxBank_CheckMail()
 		end
 	end
 	checkMailTick = time()
-	MailboxBank_db[playername].checkMailTick = checkMailTick
+	MB_DB[playername].checkMailTick = checkMailTick
 	--return true
 end
 
@@ -142,7 +145,7 @@ end
 function MailboxBank_DropDownMenuInitialize()
 	local info = UIDropDownMenu_CreateInfo();
 	
-	for k, v in pairs(MailboxBank_db) do
+	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = k
@@ -167,9 +170,9 @@ function MailboxBank_CreatFrame(name)
 	local f = CreateFrame("Button", name, UIParent)
 	f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
 	f:SetFrameStrata("DIALOG");
-	f:SetWidth(MailboxBank_config.frameWidth)
-	f:SetHeight(MailboxBank_config.frameHeight)
-	f:SetPoint(MailboxBank_config.pa or "CENTER", MailboxBank_config.px or 0, MailboxBank_config.py or 0)
+	f:SetWidth(MB_config.frameWidth)
+	f:SetHeight(MB_config.frameHeight)
+	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	--f:SetPoint("CENTER", 0, 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
@@ -179,7 +182,7 @@ function MailboxBank_CreatFrame(name)
 	end)
 	f:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		MailboxBank_config.p, MailboxBank_config.pf, MailboxBank_config.pa, MailboxBank_config.px, MailboxBank_config.py = self:GetPoint()
+		MB_config.p, MB_config.pf, MB_config.pa, MB_config.px, MB_config.py = self:GetPoint()
 	end)
 	f:Hide()
 	
@@ -219,29 +222,17 @@ function MailboxBank_CreatFrame(name)
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 8)
+	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
 	f.scrollBar:Hide()
-	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset) 
-	--print("1 "..offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, 16, MailboxBank_UpdateContainer(selectValue,offset));
-		--print("2 "..offset)
+	f.scrollBar:HookScript("OnVerticalScroll",  function(self, offset)
+		print("-------")	
+		print("OnVerticalScroll offset "..offset)
+		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing/2, MailboxBank_Update());
 	end)
 	f.scrollBar:SetScript("OnShow", function()
 		MailboxBank_UpdateContainer(selectValue)
 	end)
-	--[[f.scrollBar:EnableMouseWheel(true)
-	f.scrollBar:SetScript("OnMouseWheel", function(self, delta)
-      local current = f.scrollBar:GetValue()
-       
-      if IsShiftKeyDown() and (delta > 0) then
-         f.scrollBar:SetValue(0)
-      elseif IsShiftKeyDown() and (delta < 0) then
-         f.scrollBar:SetValue(scrollMax)
-      elseif (delta < 0) and (current < scrollMax) then
-         f.scrollBar:SetValue(current + 20)
-      elseif (delta > 0) and (current > 1) then
-         f.scrollBar:SetValue(current - 20)
-      end
-end)]]
+
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
 	local containerID = 1
@@ -253,23 +244,15 @@ end)]]
 	--f.scrollBar:SetScrollChild(f.Container[containerID])
 	--f.Container[containerID].numSlots = 0;
 	
-	---- MUST TO ADJUST AS CONST ? ---
-	local topOffset = MailboxBank_config.topOffset
-	local leftOffset = MailboxBank_config.leftOffset
-	local buttonSize = MailboxBank_config.buttonSize
-	local buttonSpacing = MailboxBank_config.buttonSpacing
-	local containerWidth = f:GetWidth()
-	local numContainerColumns = floor(containerWidth / (buttonSize + buttonSpacing));
 	local numContainerRows = 0;
-	---- MUST TO ADJUST AS CONST ? ---
 	local lastButton;
 	local lastRowButton;
-	for i = 1, BAGITEMS_ICON_DISPLAYED do
+	for i = 1, MB_config.itemsSlotDisplay do
 		local slot = CreateFrame('Button', f:GetName()..'Container'..containerID..'Slot'..i, f.Container[containerID]);
 		slot:Hide()
 		slot:SetTemplate('Default');
 		slot:StyleButton();
-		slot:Size(MailboxBank_config.buttonSize);
+		slot:Size(MB_config.buttonSize);
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
@@ -294,15 +277,15 @@ end)]]
 		f.Container[containerID][i] = slot
 		
 		if lastButton then
-			if (i - 1) % numContainerColumns == 0 then
-				slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -buttonSpacing);
+			if (i - 1) % MB_config.numItemsPerRow == 0 then
+				slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
 				lastRowButton = f.Container[containerID][i];
 				numContainerRows = numContainerRows + 1;
 			else
-				slot:Point('LEFT', lastButton, 'RIGHT', buttonSpacing, 0);
+				slot:Point('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:Point('TOPLEFT', f, 'TOPLEFT', leftOffset, -topOffset);
+			slot:Point('TOPLEFT', f, 'TOPLEFT', MB_config.leftOffset, -MB_config.topOffset);
 			lastRowButton = f.Container[containerID][i];
 			numContainerRows = numContainerRows + 1;
 		end
@@ -368,9 +351,9 @@ function MailboxBank_TooltipShow(self)
 				local rL, gL, bL = 1, 1, 1
 				if i > 1 then
 					local leftday = formatList[k][i].leftday
-					if leftday < MailboxBank_config.daysLeftRed then
+					if leftday < MB_config.daysLeftRed then
 						rL, gL, bL = 1, 0, 0
-					elseif leftday < MailboxBank_config.daysLeftYellow then
+					elseif leftday < MB_config.daysLeftYellow then
 						rL, gL, bL = 1, 1, 0
 					else
 						rL, gL, bL = 0, 1, 0
@@ -410,19 +393,17 @@ function MailboxBank_SlotClick(self,button)
 end
 
 function MailboxBank_UpdateContainer(playername,offset)
-	local buttonSize = MailboxBank_config.buttonSize
-	local buttonSpacing = MailboxBank_config.buttonSpacing
 	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
-	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MailboxBank_db[playername].money))
+	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MB_DB[playername].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
 --	local playername = selectValue
 
-	SlotDB = MailboxBank_SortDB(MailboxBank_db, playername, isStacked)
+	SlotDB = MailboxBank_SortDB(MB_DB, playername, isStacked)
 	local usedSlot = SlotDB.usedSlot
 	local containerID = 1
 
 	--scrollbar!!!
-	if ( usedSlot > BAGITEMS_ICON_DISPLAYED) then
+	if ( usedSlot > MB_config.itemsSlotDisplay) then
 		f.scrollBar:Show();
 	else
 		f.scrollBar:Hide();
@@ -431,17 +412,17 @@ function MailboxBank_UpdateContainer(playername,offset)
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
 	--print("ScrollBar offset: "..offset)
 
-	for i = 1, BAGITEMS_ICON_DISPLAYED do
+	for i = 1, MB_config.itemsSlotDisplay do
 		if f.Container[containerID][i] then
 			f.Container[containerID][i]:Hide()
 		end
 	end
-	FauxScrollFrame_Update(f.scrollBar, ceil(usedSlot / NUM_BAGITEMS_PER_ROW) , NUM_BAGITEMS_ROWS, buttonSize + buttonSpacing );
+	FauxScrollFrame_Update(f.scrollBar, ceil(usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
 	--FauxScrollFrame_Update(f.scrollBar, usedSlot, MAX_ROWS or 10, buttonSize + buttonSpacing)
 
 	local iconDisplayCount
-	if (usedSlot - offset * 8) > BAGITEMS_ICON_DISPLAYED then
-		iconDisplayCount = BAGITEMS_ICON_DISPLAYED
+	if (usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
+		iconDisplayCount = MB_config.itemsSlotDisplay
 	else
 		iconDisplayCount = usedSlot - offset * 8
 	end
@@ -513,10 +494,11 @@ function MailboxBank_OnEvent(self, event, ...)
 	--	print("MailboxBank loaded")
 	end
 	if event == "PLAYER_ENTERING_WORLD" then
-		if MailboxBank_config == nil then
-			MailboxBank_config = {}
-			E:CopyTable(MailboxBank_config, MailboxBank_config_init)
+		if MB_config == nil then
+			MB_config = {}
+			E:CopyTable(MB_config, MailboxBank_config_init)
 		end
+		if not MB_DB then MB_DB = {} end
 		MailboxBankFrame = MailboxBank_CreatFrame("MailboxBankFrame")
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
