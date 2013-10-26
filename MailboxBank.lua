@@ -8,8 +8,7 @@ local isMailShow = false
 local checkMailTick
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
---local NUM_BAGITEMS_PER_ROW, NUM_BAGITEMS_ROWS, BAGITEMS_ICON_DISPLAYED = 8, 10, 80
-local SlotDB
+--local SlotDB
 
 local MailboxBank_config_init = {
 	daysLeftYellow = 5,
@@ -29,7 +28,21 @@ local MailboxBank_config_init = {
 	py = 0,
 }	
 
-function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
+local itemTypes, itemSubTypes
+
+-- local function BuildSortOrder()
+	-- itemTypes = {}
+	-- itemSubTypes = {}
+	-- for i, iType in ipairs({GetAuctionItemClasses()}) do
+		-- itemTypes[iType] = i
+		-- itemSubTypes[iType] = {}
+		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
+			-- itemSubTypes[iType][isType] = ii
+		-- end
+	-- end
+-- end
+
+local function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
 	local item = {}
 	--item["name"] = name
 	item["sender"] = sender
@@ -39,12 +52,12 @@ function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLef
 	item["daysLeft"] = daysLeft
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
-	--item["wasReturned"] = wasReturned
+	item["wasReturned"] = wasReturned
 	tinsert(MB_DB[playername], item)
 	MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
 end
 
-function MailboxBank_CheckMail()
+local function MailboxBank_CheckMail()
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
@@ -74,16 +87,17 @@ function MailboxBank_CheckMail()
 end
 
 function MailboxBank_ChooseChar_OnClick(self)
-	MailboxBank_UpdateContainer(self.value)
 	selectValue = self.value
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
 
+	MailboxBank_Update("sortDB")
+	
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	MailboxBankFrameDropDown:SetWidth(width+60)	
 end
 
-function FormatMoney(money)
+local function FormatMoney(money)
 	--if money == 0 or not money then return 0 end
 	local copperFormatter = join("", "%d", L.copperabbrev)
 	local silverFormatter = join("", "%d", L.silverabbrev, " %.2d", L.copperabbrev)
@@ -102,39 +116,100 @@ function FormatMoney(money)
 	end
 end
 
-function MailboxBank_SortDB(oriDB, player, isStacked)
-
-	local numItems = oriDB[player].itemCount
+function MailboxBank_SortDB()
+	local numItems = MB_DB[selectValue].itemCount
 	local usedSlot = 0
 	local slotDB = {}
-	for itemID = 1, numItems do
+	for itemIndexCount = 1, numItems do
 		local slot
 		if isStacked then
 			for i = 1, usedSlot do
-				if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(oriDB[player][itemID].itemLink, "item:(%d+)")) then
+				if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)")) then
 					slot = slotDB[i]
 				end
 			end
 		end	
 		if not slot then
+			--[[if isAHOrder then ---- TODO: ordering as AH
+				if not itemTypes then BuildSortOrder() end
+				-- local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, itemSellPrice = GetItemInfo(itemLink)
+				if not ahOrdering then local ahOrdering = {} end
+				local _, _, _, _, _, itemType, itemSubType, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndex].itemLink)
+				local itemID = tonumber(match(MB_DB[selectValue][itemIndex].itemLink, "item:(%d+)"))
+				local ahIndex = itemTypes[itemType] * 100 + itemSubTypes[itemType][itemSubType]
+				local itemAHIndex = ahIndex * 1000000 + itemID
+				itemAHIndex = itemAHIndex * 1000 + 999 --  format: AABBIIIIIINN
+				
+				usedSlot = usedSlot + 1
+				for slotID, value in ipairs(ahOrdering) do
+					if slotID == getn(ahOrdering) then
+						if ((value mod 1000) == (itemAHIndex mod 1000) )then
+							ahOrdering[slotID + 1] = value + 1
+						else
+							ahOrdering[slotID + 1] = itemAHIndex - 999
+						end
+						
+						slotDB[slotID + 1] = {}
+						slot = slotDB[slotID + 1]
+						break
+					elseif slotID == 1 and ahOrdering[slotID] > itemAHIndex then
+						for i = getn(ahOrdering), slotID , -1 do -- move forward
+							ahOrdering[i + 1] = ahOrdering[i]
+						end
+						ahOrdering[slotID + 1] = itemAHIndex - 999
+						
+						slotDB[slotID + 1] = {}
+						slot = slotDB[slotID + 1]
+						break
+					elseif ((value < itemAHIndex) or (slotID == 1)) and ahOrdering[slotID + 1] > itemAHIndex then
+						for i = getn(ahOrdering), slotID + 1, -1 do -- move forward
+							ahOrdering[i + 1] = ahOrdering[i]
+						end
+						if (value mod 1000) == (itemAHIndex mod 1000) then
+							ahOrdering[slotID + 1] = value + 1
+						else
+							ahOrdering[slotID + 1] = itemAHIndex - 999
+						end
+						
+						slotDB[slotID + 1] = {}
+						slot = slotDB[slotID + 1]
+						break
+					end
+				end
+				
+			else
+				usedSlot = usedSlot + 1
+				slotDB[usedSlot] = {}
+				slot = slotDB[usedSlot]
+			end]]
+
+			
 			usedSlot = usedSlot + 1
+			--slotDB[usedSlot] = {}
+			--slot = slotDB[usedSlot]
+			
+			
 			slotDB[usedSlot] = {}
 			slot = slotDB[usedSlot]
 			
-			slot.link = oriDB[player][itemID].itemLink
-			slot.checkMailTick = oriDB[player].checkMailTick
+			slot.link = MB_DB[selectValue][itemIndexCount].itemLink
+			slot.checkMailTick = MB_DB[selectValue].checkMailTick
 			slot.sender = {}
 			slot.dayLeft = {}
 			slot.countNum = {}
-			if player == playername and not isStacked then
-				slot.mailIndex = oriDB[player][itemID].mailIndex
-				slot.itemIndex = oriDB[player][itemID].itemIndex
+			slot.wasReturned = {}
+			if selectValue == playername and not isStacked then
+				slot.mailIndex = MB_DB[selectValue][itemIndexCount].mailIndex
+				slot.itemIndex = MB_DB[selectValue][itemIndexCount].itemIndex
+			end
+			if not isStacked then
+				slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
 			end
 		end
 		
-		tinsert(slot.sender , oriDB[player][itemID].sender)
-		tinsert(slot.dayLeft , oriDB[player][itemID].daysLeft)
-		tinsert(slot.countNum , oriDB[player][itemID].count)
+		tinsert(slot.sender , MB_DB[selectValue][itemIndexCount].sender)
+		tinsert(slot.dayLeft , MB_DB[selectValue][itemIndexCount].daysLeft)
+		tinsert(slot.countNum , MB_DB[selectValue][itemIndexCount].count)
 	end
 	slotDB.usedSlot = usedSlot
 	return slotDB
@@ -142,9 +217,8 @@ end
 
 
 ---- GUI ----
-function MailboxBank_DropDownMenuInitialize()
+local function MailboxBank_DropDownMenuInitialize()
 	local info = UIDropDownMenu_CreateInfo();
-	
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			info = UIDropDownMenu_CreateInfo()
@@ -154,18 +228,13 @@ function MailboxBank_DropDownMenuInitialize()
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, selectValue);
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	MailboxBankFrameDropDown:SetWidth(width+60)
 end
 
-function MailboxBank_ScrollBarUpdate()
-
-end
-
-function MailboxBank_CreatFrame(name)
+local function MailboxBank_CreatFrame(name)
 	----Create mailbox bank frame
 	local f = CreateFrame("Button", name, UIParent)
 	f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
@@ -197,7 +266,7 @@ function MailboxBank_CreatFrame(name)
 	f.checkButton.text:SetText("堆疊物品")
 	f.checkButton:SetScript("OnClick", function(self)
 		isStacked = self:GetChecked()
-		MailboxBank_UpdateContainer(selectValue)
+		MailboxBank_Update("sortDB")
 	end)
 	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
 	
@@ -206,6 +275,7 @@ function MailboxBank_CreatFrame(name)
 	f.mailboxGold:FontTemplate()
 	f.mailboxGold:Point("BOTTOMLEFT", 20, 5);
 	
+	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, f:GetName())
 	local chooseChar = CreateFrame('Frame', f:GetName()..'DropDown', f, 'UIDropDownMenuTemplate')
 	chooseChar:Point("TOPLEFT", 80, -6)
@@ -213,28 +283,22 @@ function MailboxBank_CreatFrame(name)
 	f.chooseChar = chooseChar
 	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
 
-	----Create sort dropdown menu
-	--[[local f.dropDownMenu = CreateFrame("Frame", f:GetName().."DropDown", f, "UIDropDownMenuTemplate")
-	f.dropDownMenu:Point("TOPLEFT", 80, -6)
-	E.Skins:HandleDropDownBox(f.dropDownMenu, 180)
-	UIDropDownMenu_Initialize(f.dropDownMenu, MailboxBank_DropDownMenuInitialize);]]
-	
+	----Create scroll frame
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
-	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 8)
+	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 64)
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
 	f.scrollBar:Hide()
 	f.scrollBar:HookScript("OnVerticalScroll",  function(self, offset)
-		print("-------")	
-		print("OnVerticalScroll offset "..offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing/2, MailboxBank_Update());
+		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
+		MailboxBank_Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
-		MailboxBank_UpdateContainer(selectValue)
+		MailboxBank_Update("sortDB")
 	end)
-
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
+	----Create Container
 	local containerID = 1
 	f.Container = {}
 	f.Container[containerID] = CreateFrame('Frame', f:GetName()..'Container'..containerID, f);
@@ -363,6 +427,10 @@ function MailboxBank_TooltipShow(self)
 			end
 		end
 		
+		if self.wasReturned == 1 then
+			GameTooltip:AddLine("已被退回")
+		end
+
 		GameTooltip:Show()
 	end
 end
@@ -387,50 +455,46 @@ function MailboxBank_SlotClick(self,button)
 	elseif button == 'LeftButton' then
 		if self.mailIndex and self.itemIndex then
 			TakeInboxItem(self.mailIndex, self.itemIndex)
+			MailboxBank_Update("sortDB")
 		end
 	end
 
 end
 
-function MailboxBank_UpdateContainer(playername,offset)
+function MailboxBank_UpdateContainer(SlotDB)
 	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
-	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MB_DB[playername].money))
-	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[playername].checkMailTick)/60).." 分鐘前掃描" or "");
---	local playername = selectValue
-
-	SlotDB = MailboxBank_SortDB(MB_DB, playername, isStacked)
-	local usedSlot = SlotDB.usedSlot
 	local containerID = 1
-
-	--scrollbar!!!
-	if ( usedSlot > MB_config.itemsSlotDisplay) then
-		f.scrollBar:Show();
-	else
-		f.scrollBar:Hide();
-	end
-
-	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
-	--print("ScrollBar offset: "..offset)
-
 	for i = 1, MB_config.itemsSlotDisplay do
 		if f.Container[containerID][i] then
 			f.Container[containerID][i]:Hide()
 		end
 	end
-	FauxScrollFrame_Update(f.scrollBar, ceil(usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
-	--FauxScrollFrame_Update(f.scrollBar, usedSlot, MAX_ROWS or 10, buttonSize + buttonSpacing)
+	if not SlotDB then return end
+	
+	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MB_DB[selectValue].money))
+	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectValue].checkMailTick)/60).." 分鐘前掃描" or "");
 
+	--if not SlotDB then SlotDB = MailboxBank_SortDB() end
+	--local SlotDB = MailboxBank_SortDB()
+	--collectgarbage()
+	--local usedSlot = SlotDB.usedSlot
+	
+
+	--scrollbar!!!
+	
+	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
+	
 	local iconDisplayCount
-	if (usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
+	if (SlotDB.usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
 		iconDisplayCount = MB_config.itemsSlotDisplay
 	else
-		iconDisplayCount = usedSlot - offset * 8
+		iconDisplayCount = SlotDB.usedSlot - offset * 8
 	end
 	
 	for i = 1, iconDisplayCount do
 		local itemID = i + offset * 8
 		
-		slot = f.Container[containerID][i]
+		local slot = f.Container[containerID][i]
 		slot.link = SlotDB[itemID].link
 		slot.checkMailTick = SlotDB[itemID].checkMailTick
 		slot.sender = SlotDB[itemID].sender
@@ -438,9 +502,11 @@ function MailboxBank_UpdateContainer(playername,offset)
 		slot.countnum = SlotDB[itemID].countNum
 		
 		if SlotDB[itemID].mailIndex and SlotDB[itemID].itemIndex then
-			--print()
 			slot.mailIndex = SlotDB[itemID].mailIndex
 			slot.itemIndex = SlotDB[itemID].itemIndex
+		end
+		if SlotDB[itemID].wasReturned then
+			slot.wasReturned = SlotDB[itemID].wasReturned
 		end
 		
 		if slot.link then
@@ -463,23 +529,30 @@ function MailboxBank_UpdateContainer(playername,offset)
 		slot.count:SetText(countnum > 1 and countnum or '');
 		slot:Show()
 	end
+	FauxScrollFrame_Update(f.scrollBar, ceil(SlotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
+end
+
+function MailboxBank_Update(event)
+	--if event == "sortDB" then MailboxBank_SortDB() end
+	local SortDB = MailboxBank_SortDB()
+	MailboxBank_UpdateContainer(SortDB)
 end
 
 ---- Event ----
-function MailboxBank_Show()
+local function MailboxBank_Show()
 	selectValue = playername;
 	MailboxBankFrame:Show()
 end
 
-function MailboxBank_Hide()
+local function MailboxBank_Hide()
 	MailboxBankFrame:Hide()
 end
 
-function MailboxBank_OnEvent(self, event, ...)
+local function MailboxBank_OnEvent(self, event, ...)
 	if event == "MAIL_INBOX_UPDATE" then
 		MailboxBank_CheckMail()
 		if selectValue == playername then
-			MailboxBank_UpdateContainer(playername)
+			MailboxBank_Update("sortDB")
 		end
 	end
 	if event == "MAIL_SHOW" then
@@ -518,7 +591,7 @@ SlashCmdList["MAILBOXBANK"] = function()
 	if MailboxBankFrame and MailboxBankFrame:IsVisible() then
 		MailboxBank_Hide()
 	else
-		MailboxBank_UpdateContainer(selectValue)
+		MailboxBank_Update("sortDB")
 		MailboxBank_Show()
 	end
 end;
