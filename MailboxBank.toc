@@ -1,9 +1,9 @@
-## Interface: 50300
+## Interface: 50400
 ## Author: Henrui @ 幽暗沼泽 zhengruiw02@gmail.com 
 ## Title: Mailbox Bank
 ## Title-zhCN: 邮箱银行
 ## Title-zhTW: 郵箱銀行
-## Version: alpha 10
+## Version: beta 1
 ## RequiredDeps: ElvUI
 ## SavedVariables: MB_DB, MB_config
 

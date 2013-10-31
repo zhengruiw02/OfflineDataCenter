@@ -1,14 +1,15 @@
+--@@ TODO: solve COD item, maybe can display COD amount above the slot icon or tooltip
+--@@ TODO: func.SortDB clear up! collect grabage
+--@@ TODO: add AH ordering
+--@@ TODO: should attachments can be collect when items are stacked??
 local E, L, V, P, G, _ = unpack(ElvUI); --Inport: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local match, join, format = string.match, string.join, string.format
-local isStacked
-local isMailShow = false
-local checkMailTick
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
---local SlotDB
+local slotDB
 
 local MailboxBank_config_init = {
 	daysLeftYellow = 5,
@@ -26,6 +27,7 @@ local MailboxBank_config_init = {
 	maxrow = 10,
 	px = 0,
 	py = 0,
+	isStacked = false,
 }	
 
 local itemTypes, itemSubTypes
@@ -66,8 +68,10 @@ local function MailboxBank_CheckMail()
 			--if isGM ~= nil then print("GM@"..sender) end
 			if money > 0 then MB_DB[playername].money = MB_DB[playername].money + money end
 			if hasItem and CODAmount == 0 then
+			--@@ TODO: solve COD item, maybe can display COD amount in the slot icon or tooltip
 				if sender == nil then
-					sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
+					--sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
+					sender = "----" 
 					--return false
 				end
 				if wasRead then hasItem = ATTACHMENTS_MAX_RECEIVE end
@@ -81,7 +85,7 @@ local function MailboxBank_CheckMail()
 			end
 		end
 	end
-	checkMailTick = time()
+	local checkMailTick = time()
 	MB_DB[playername].checkMailTick = checkMailTick
 	--return true
 end
@@ -117,12 +121,13 @@ local function FormatMoney(money)
 end
 
 function MailboxBank_SortDB()
+--@@  TODO: clear up! collect grabage
 	local numItems = MB_DB[selectValue].itemCount
 	local usedSlot = 0
-	local slotDB = {}
+	slotDB = {}
 	for itemIndexCount = 1, numItems do
 		local slot
-		if isStacked then
+		if MB_config.isStacked then
 			for i = 1, usedSlot do
 				if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)")) then
 					slot = slotDB[i]
@@ -130,6 +135,7 @@ function MailboxBank_SortDB()
 			end
 		end	
 		if not slot then
+		--@@  TODO: add AH ordering
 			--[[if isAHOrder then ---- TODO: ordering as AH
 				if not itemTypes then BuildSortOrder() end
 				-- local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, itemSellPrice = GetItemInfo(itemLink)
@@ -198,11 +204,12 @@ function MailboxBank_SortDB()
 			slot.dayLeft = {}
 			slot.countNum = {}
 			slot.wasReturned = {}
-			if selectValue == playername and not isStacked then
+			if selectValue == playername and not MB_config.isStacked then
 				slot.mailIndex = MB_DB[selectValue][itemIndexCount].mailIndex
 				slot.itemIndex = MB_DB[selectValue][itemIndexCount].itemIndex
 			end
-			if not isStacked then
+			if not MB_config.isStacked then
+			--@@  TODO: should attachments can be collected when items are stacked??
 				slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
 			end
 		end
@@ -265,7 +272,7 @@ local function MailboxBank_CreatFrame(name)
 	f.checkButton:Point("TOPLEFT", 2, -2)
 	f.checkButton.text:SetText("堆疊物品")
 	f.checkButton:SetScript("OnClick", function(self)
-		isStacked = self:GetChecked()
+		MB_config.isStacked = self:GetChecked()
 		MailboxBank_Update("sortDB")
 	end)
 	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
@@ -276,8 +283,8 @@ local function MailboxBank_CreatFrame(name)
 	f.mailboxGold:Point("BOTTOMLEFT", 20, 5);
 	
 	----Create choose char dropdown menu
-	tinsert(UISpecialFrames, f:GetName())
-	local chooseChar = CreateFrame('Frame', f:GetName()..'DropDown', f, 'UIDropDownMenuTemplate')
+	tinsert(UISpecialFrames, name)
+	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
 	chooseChar:Point("TOPLEFT", 80, -6)
 	E.Skins:HandleDropDownBox(chooseChar, 180)
 	f.chooseChar = chooseChar
@@ -289,19 +296,25 @@ local function MailboxBank_CreatFrame(name)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 64)
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
 	f.scrollBar:Hide()
-	f.scrollBar:HookScript("OnVerticalScroll",  function(self, offset)
+	--f.scrollBar:EnableMouseWheel(true)
+	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
+		--collectgarbage()
 		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
 		MailboxBank_Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
 		MailboxBank_Update("sortDB")
 	end)
+	
+	--f.scrollBar:SetScript("OnMouseWheel", function(self, delta)
+    --  DEFAULT_CHAT_FRAME:AddMessage(delta)
+	--end)
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
 	----Create Container
 	local containerID = 1
 	f.Container = {}
-	f.Container[containerID] = CreateFrame('Frame', f:GetName()..'Container'..containerID, f);
+	f.Container[containerID] = CreateFrame('Frame', name..'Container'..containerID, f);
 	f.Container[containerID]:SetID(containerID);
 	f.Container[containerID]:Show()
 	
@@ -312,7 +325,7 @@ local function MailboxBank_CreatFrame(name)
 	local lastButton;
 	local lastRowButton;
 	for i = 1, MB_config.itemsSlotDisplay do
-		local slot = CreateFrame('Button', f:GetName()..'Container'..containerID..'Slot'..i, f.Container[containerID]);
+		local slot = CreateFrame('Button', name..'Container'..containerID..'Slot'..i, f.Container[containerID]);
 		slot:Hide()
 		slot:SetTemplate('Default');
 		slot:StyleButton();
@@ -354,7 +367,6 @@ local function MailboxBank_CreatFrame(name)
 			numContainerRows = numContainerRows + 1;
 		end
 		lastButton = f.Container[containerID][i];
-		
 	end
 	
 	return f
@@ -469,6 +481,7 @@ function MailboxBank_UpdateContainer(SlotDB)
 			f.Container[containerID][i]:Hide()
 		end
 	end
+	f.checkButton:SetChecked(MB_config.isStacked)
 	if not SlotDB then return end
 	
 	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MB_DB[selectValue].money))
@@ -533,19 +546,20 @@ function MailboxBank_UpdateContainer(SlotDB)
 end
 
 function MailboxBank_Update(event)
-	--if event == "sortDB" then MailboxBank_SortDB() end
-	local SortDB = MailboxBank_SortDB()
-	MailboxBank_UpdateContainer(SortDB)
+	if event == "sortDB" then MailboxBank_SortDB() end
+	--local slotDB = MailboxBank_SortDB()
+	MailboxBank_UpdateContainer(slotDB)
 end
 
 ---- Event ----
 local function MailboxBank_Show()
-	selectValue = playername;
+	--selectValue = playername;
 	MailboxBankFrame:Show()
 end
 
 local function MailboxBank_Hide()
 	MailboxBankFrame:Hide()
+	collectgarbage()
 end
 
 local function MailboxBank_OnEvent(self, event, ...)
@@ -556,11 +570,9 @@ local function MailboxBank_OnEvent(self, event, ...)
 		end
 	end
 	if event == "MAIL_SHOW" then
-		isMailShow = true
 		if not MailboxBankFrame:IsVisible() then MailboxBank_Show(); end
 	end
 	if event == "MAIL_CLOSED" then
-		isMailShow = false
 		MailboxBank_Hide()
 	end
 	if event == "ADDON_LOADED" then
@@ -572,7 +584,7 @@ local function MailboxBank_OnEvent(self, event, ...)
 			E:CopyTable(MB_config, MailboxBank_config_init)
 		end
 		if not MB_DB then MB_DB = {} end
-		MailboxBankFrame = MailboxBank_CreatFrame("MailboxBankFrame")
+		MailboxBank_CreatFrame("MailboxBankFrame")
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
 end
