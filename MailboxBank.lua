@@ -1,15 +1,31 @@
---@@ TODO: solve COD item, maybe can display COD amount above the slot icon or tooltip
---@@ TODO: func.SortDB clear up! collect grabage
+--@@ TODO: solve COD item, maybe displaying COD amount above the slot icon or using tool-tip
+
+--@@ TODO: function SortDB must clear up! collect garbage !!!
+	--UC..
+
+--@@ TODO: add searching bar!
+
 --@@ TODO: add AH ordering
---@@ TODO: should attachments can be collect when items are stacked??
-local E, L, V, P, G, _ = unpack(ElvUI); --Inport: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
+	--UC..bad to do
+
+--@@ TODO: should stacked attachments can be collect??
+
+--@@ TODO: collect mailbox gold??
+	--DONE!
+
+--@@ TODO: should attachments info be save to database when sending to known player's other characters?
+	--UC..
+
+--@@ TODO: should attachments be alert to player to collect when almost in deadline?
+
+local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local match, join, format = string.match, string.join, string.format
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
-local slotDB
+local slotDB, sendItemInfo
 
 local MailboxBank_config_init = {
 	daysLeftYellow = 5,
@@ -44,29 +60,35 @@ local itemTypes, itemSubTypes
 	-- end
 -- end
 
-local function MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
+local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, canUse)
 	local item = {}
-	--item["name"] = name
 	item["sender"] = sender
-	--item["itemTexture"] = itemTexture
 	item["count"] = count
 	item["itemLink"] = itemLink
 	item["daysLeft"] = daysLeft
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
 	item["wasReturned"] = wasReturned
+	item["canUse"] = canUse
 	tinsert(MB_DB[playername], item)
 	MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
 end
 
-local function MailboxBank_CheckMail()
+local function MailboxBank_CheckMail(isCollectMoney)
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
-			local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
+			--local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
+			local _, _, sender, _, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, _, _, _ = GetInboxHeaderInfo(mailIndex);
 			--if isGM ~= nil then print("GM@"..sender) end
-			if money > 0 then MB_DB[playername].money = MB_DB[playername].money + money end
+			if money > 0 then
+				if isCollectMoney then
+					TakeInboxMoney(mailIndex)
+				else
+					MB_DB[playername].money = MB_DB[playername].money + money
+				end
+			end
 			if hasItem and CODAmount == 0 then
 			--@@ TODO: solve COD item, maybe can display COD amount in the slot icon or tooltip
 				if sender == nil then
@@ -74,31 +96,20 @@ local function MailboxBank_CheckMail()
 					sender = "----" 
 					--return false
 				end
-				if wasRead then hasItem = ATTACHMENTS_MAX_RECEIVE end
-				for itemIndex = 1, hasItem do
+				-- if wasRead then hasItem = ATTACHMENTS_MAX_RECEIVE end
+				-- for itemIndex = 1, hasItem do
+				for itemIndex = 1, ATTACHMENTS_MAX_RECEIVE do
 					local name, itemTexture, count, quality, canUse = GetInboxItem(mailIndex, itemIndex)
 					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
-					if name and itemLink then
-						MailboxBank_AddItem(sender, name, itemTexture, count, itemLink, daysLeft, mailIndex, itemIndex, wasReturned)
+					if itemLink then
+						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, canUse)
 					end
 				end
 			end
 		end
 	end
-	local checkMailTick = time()
-	MB_DB[playername].checkMailTick = checkMailTick
+	MB_DB[playername].checkMailTick = time()
 	--return true
-end
-
-function MailboxBank_ChooseChar_OnClick(self)
-	selectValue = self.value
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
-
-	MailboxBank_Update("sortDB")
-	
-	local text = MailboxBankFrameDropDownText;
-	local width = text:GetStringWidth();
-	MailboxBankFrameDropDown:SetWidth(width+60)	
 end
 
 local function FormatMoney(money)
@@ -118,6 +129,10 @@ local function FormatMoney(money)
 	else
 		return format(copperFormatter, copper)
 	end
+end
+
+local function MailboxBank_CollectMoney()
+	MailboxBank_CheckMail(true)
 end
 
 function MailboxBank_SortDB()
@@ -222,8 +237,18 @@ function MailboxBank_SortDB()
 	return slotDB
 end
 
-
 ---- GUI ----
+function MailboxBank_ChooseChar_OnClick(self)
+	selectValue = self.value
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
+
+	MailboxBank_Update(true)
+	
+	local text = MailboxBankFrameDropDownText;
+	local width = text:GetStringWidth();
+	MailboxBankFrameDropDown:SetWidth(width+60)	
+end
+
 local function MailboxBank_DropDownMenuInitialize()
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(MB_DB) do
@@ -265,22 +290,39 @@ local function MailboxBank_CreatFrame(name)
 	----Create close button
 	f.closeButton = CreateFrame("Button", name.."CloseButton", f, "UIPanelCloseButton");
 	f.closeButton:Point("TOPRIGHT", -2, -2);
+	f.closeButton:HookScript("OnClick", function()
+		collectgarbage("collect")
+	end)
 	E:GetModule("Skins"):HandleCloseButton(f.closeButton);
 	
-	----Creat check button
-	f.checkButton = CreateFrame("CheckButton", name.."CheckButton", f, "UICheckButtonTemplate");
-	f.checkButton:Point("TOPLEFT", 2, -2)
-	f.checkButton.text:SetText("堆疊物品")
-	f.checkButton:SetScript("OnClick", function(self)
+	----Create stack up button
+	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
+	f.stackUpCheckButton:Point("TOPLEFT", 2, -2)
+	f.stackUpCheckButton.text:SetText("堆疊物品")
+	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
-		MailboxBank_Update("sortDB")
+		MailboxBank_Update(true)
 	end)
-	E:GetModule("Skins"):HandleCheckBox(f.checkButton);
+	E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
+	
+	----Create collect mailbox gold button
+	f.CollectGoldButton = CreateFrame("Button", name.."CollectGoldButton", f, "UIPanelButtonTemplate");
+	f.CollectGoldButton:SetWidth(100)
+	f.CollectGoldButton:SetHeight(30)
+	f.CollectGoldButton:Point("BOTTOMLEFT", 10, 5);
+	f.CollectGoldButton:SetText("收取金幣")
+	f.CollectGoldButton:SetScript("OnClick", MailboxBank_CollectMoney)
+	E:GetModule("Skins"):HandleButton(f.CollectGoldButton)
+	
+	----Create mailbox gold text
+	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
+	f.mailboxGoldText:FontTemplate()
+	f.mailboxGoldText:Point("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	
 	----Create check time text
-	f.mailboxGold = f:CreateFontString(nil, 'OVERLAY');
-	f.mailboxGold:FontTemplate()
-	f.mailboxGold:Point("BOTTOMLEFT", 20, 5);
+	-- f.checktime = f:CreateFontString(nil, 'OVERLAY');
+	-- f.checktime:FontTemplate()
+	-- f.checktime:Point("BOTTOMLEFT", 20, 5);
 	
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, name)
@@ -298,15 +340,16 @@ local function MailboxBank_CreatFrame(name)
 	f.scrollBar:Hide()
 	--f.scrollBar:EnableMouseWheel(true)
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		--collectgarbage()
 		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
 		MailboxBank_Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
-		MailboxBank_Update("sortDB")
+		MailboxBank_Update()
+		--MailboxBank_Update(true)
 	end)
 	
 	--f.scrollBar:SetScript("OnMouseWheel", function(self, delta)
+	--	collectgarbage()
     --  DEFAULT_CHAT_FRAME:AddMessage(delta)
 	--end)
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
@@ -369,7 +412,7 @@ local function MailboxBank_CreatFrame(name)
 		lastButton = f.Container[containerID][i];
 	end
 	
-	return f
+	-- return f
 end
 
 function MailboxBank_TooltipShow(self)
@@ -467,13 +510,13 @@ function MailboxBank_SlotClick(self,button)
 	elseif button == 'LeftButton' then
 		if self.mailIndex and self.itemIndex then
 			TakeInboxItem(self.mailIndex, self.itemIndex)
-			MailboxBank_Update("sortDB")
+			MailboxBank_Update(true)
 		end
 	end
 
 end
 
-function MailboxBank_UpdateContainer(SlotDB)
+function MailboxBank_UpdateContainer()
 	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
 	local containerID = 1
 	for i = 1, MB_config.itemsSlotDisplay do
@@ -481,45 +524,37 @@ function MailboxBank_UpdateContainer(SlotDB)
 			f.Container[containerID][i]:Hide()
 		end
 	end
-	f.checkButton:SetChecked(MB_config.isStacked)
-	if not SlotDB then return end
+	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
+	if not slotDB then return end
 	
-	f.mailboxGold:SetText("郵箱金幣: "..FormatMoney(MB_DB[selectValue].money))
+	f.mailboxGoldText:SetText("郵箱金幣: "..FormatMoney(MB_DB[selectValue].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectValue].checkMailTick)/60).." 分鐘前掃描" or "");
 
-	--if not SlotDB then SlotDB = MailboxBank_SortDB() end
-	--local SlotDB = MailboxBank_SortDB()
-	--collectgarbage()
-	--local usedSlot = SlotDB.usedSlot
-	
-
-	--scrollbar!!!
-	
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
 	
 	local iconDisplayCount
-	if (SlotDB.usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
+	if (slotDB.usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
 		iconDisplayCount = MB_config.itemsSlotDisplay
 	else
-		iconDisplayCount = SlotDB.usedSlot - offset * 8
+		iconDisplayCount = slotDB.usedSlot - offset * 8
 	end
 	
 	for i = 1, iconDisplayCount do
 		local itemID = i + offset * 8
 		
 		local slot = f.Container[containerID][i]
-		slot.link = SlotDB[itemID].link
-		slot.checkMailTick = SlotDB[itemID].checkMailTick
-		slot.sender = SlotDB[itemID].sender
-		slot.dayleft = SlotDB[itemID].dayLeft
-		slot.countnum = SlotDB[itemID].countNum
+		slot.link = slotDB[itemID].link
+		slot.checkMailTick = slotDB[itemID].checkMailTick
+		slot.sender = slotDB[itemID].sender
+		slot.dayleft = slotDB[itemID].dayLeft
+		slot.countnum = slotDB[itemID].countNum
 		
-		if SlotDB[itemID].mailIndex and SlotDB[itemID].itemIndex then
-			slot.mailIndex = SlotDB[itemID].mailIndex
-			slot.itemIndex = SlotDB[itemID].itemIndex
+		if slotDB[itemID].mailIndex and slotDB[itemID].itemIndex then
+			slot.mailIndex = slotDB[itemID].mailIndex
+			slot.itemIndex = slotDB[itemID].itemIndex
 		end
-		if SlotDB[itemID].wasReturned then
-			slot.wasReturned = SlotDB[itemID].wasReturned
+		if slotDB[itemID].wasReturned then
+			slot.wasReturned = slotDB[itemID].wasReturned
 		end
 		
 		if slot.link then
@@ -542,16 +577,36 @@ function MailboxBank_UpdateContainer(SlotDB)
 		slot.count:SetText(countnum > 1 and countnum or '');
 		slot:Show()
 	end
-	FauxScrollFrame_Update(f.scrollBar, ceil(SlotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
+	FauxScrollFrame_Update(f.scrollBar, ceil(slotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
 end
 
-function MailboxBank_Update(event)
-	if event == "sortDB" then MailboxBank_SortDB() end
-	--local slotDB = MailboxBank_SortDB()
-	MailboxBank_UpdateContainer(slotDB)
+function MailboxBank_Update(isSortDB)
+	if isSortDB then MailboxBank_SortDB() end
+	MailboxBank_UpdateContainer()
 end
 
 ---- Event ----
+local function MailboxBank_HookSendMail(recipient, subject, body)
+	sendItemInfo = {}
+	for i = 1 , ATTACHMENTS_MAX_RECEIVE do
+		local Name, _, count, _ = GetSendMailItem(i)
+		if Name then
+			local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
+			sendItemInfo[i] = {}
+			sendItemInfo[i].count = count
+			sendItemInfo[i].itemLink = itemLink
+		end
+	end
+	local isMyChar
+	for k, v in pairs(MB_DB) do
+		if type(k) == 'string' and type(v) == 'table' then
+			if recipient..'-'..E.myrealm == k then
+				isMyChar = true
+			end
+		end
+	end
+end
+
 local function MailboxBank_Show()
 	--selectValue = playername;
 	MailboxBankFrame:Show()
@@ -559,14 +614,14 @@ end
 
 local function MailboxBank_Hide()
 	MailboxBankFrame:Hide()
-	collectgarbage()
+	collectgarbage("collect")
 end
 
-local function MailboxBank_OnEvent(self, event, ...)
+local function MailboxBank_OnEvent(self, event, args)
 	if event == "MAIL_INBOX_UPDATE" then
 		MailboxBank_CheckMail()
 		if selectValue == playername then
-			MailboxBank_Update("sortDB")
+			MailboxBank_Update(true)
 		end
 	end
 	if event == "MAIL_SHOW" then
@@ -575,9 +630,9 @@ local function MailboxBank_OnEvent(self, event, ...)
 	if event == "MAIL_CLOSED" then
 		MailboxBank_Hide()
 	end
-	if event == "ADDON_LOADED" then
-	--	print("MailboxBank loaded")
-	end
+	-- if event == "ADDON_LOADED" then
+		-- print("MailboxBank loaded")
+	-- end
 	if event == "PLAYER_ENTERING_WORLD" then
 		if MB_config == nil then
 			MB_config = {}
@@ -587,23 +642,35 @@ local function MailboxBank_OnEvent(self, event, ...)
 		MailboxBank_CreatFrame("MailboxBankFrame")
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
+	-- if event == "MAIL_SEND_INFO_UPDATE" then
+		-- MailboxBank_MailSendInfoUpdate()
+		-- print(event)
+	-- end
+	-- if event == "MAIL_SEND_SUCCESS" then
+		-- print(event)
+	-- end
 end
 
 local MailboxBank_Event = CreateFrame("Frame")
-MailboxBank_Event:RegisterEvent("ADDON_LOADED")
+--MailboxBank_Event:RegisterEvent("ADDON_LOADED")
 MailboxBank_Event:RegisterEvent("PLAYER_ENTERING_WORLD")
 MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 MailboxBank_Event:RegisterEvent("MAIL_SHOW")
 MailboxBank_Event:RegisterEvent("MAIL_CLOSED")
+--MailboxBank_Event:RegisterEvent("MAIL_SEND_INFO_UPDATE")
+--MailboxBank_Event:RegisterEvent("MAIL_SEND_SUCCESS")
 MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
+
+hooksecurefunc("SendMail", MailboxBank_HookSendMail)
 
 SLASH_MAILBOXBANK1 = "/mb";
 SLASH_MAILBOXBANK2 = "/mailbox";
 SlashCmdList["MAILBOXBANK"] = function()
-	if MailboxBankFrame and MailboxBankFrame:IsVisible() then
+	if not MailboxBankFrame then return end
+	if MailboxBankFrame:IsVisible() then
 		MailboxBank_Hide()
 	else
-		MailboxBank_Update("sortDB")
+		MailboxBank_Update(true)
 		MailboxBank_Show()
 	end
 end;
