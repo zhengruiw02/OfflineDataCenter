@@ -2,21 +2,19 @@
 
 --@@ TODO: function SortDB must clear up! collect garbage !!!
 	--UC..
-
 --@@ TODO: add searching bar!
 
 --@@ TODO: add AH ordering
 	--UC..bad to do
-
 --@@ TODO: should stacked attachments can be collect??
 
 --@@ TODO: collect mailbox gold??
 	--DONE!
+--@@ TODO: should attachments info be saved to database when sending to known player's other characters?
+	--DONE!
+--@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 
---@@ TODO: should attachments info be save to database when sending to known player's other characters?
-	--UC..
-
---@@ TODO: should attachments be alert to player to collect when almost in deadline?
+--@@ TODO: localization!
 
 local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
@@ -60,7 +58,7 @@ local itemTypes, itemSubTypes
 	-- end
 -- end
 
-local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, canUse)
+local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, recipient)
 	local item = {}
 	item["sender"] = sender
 	item["count"] = count
@@ -69,9 +67,13 @@ local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex,
 	item["mailIndex"] = mailIndex
 	item["itemIndex"] = itemIndex
 	item["wasReturned"] = wasReturned
-	item["canUse"] = canUse
-	tinsert(MB_DB[playername], item)
-	MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
+	if recipient then
+		tinsert(MB_DB[recipient], 1, item)
+		MB_DB[recipient].itemCount = MB_DB[recipient].itemCount + 1
+	else
+		tinsert(MB_DB[playername], item)
+		MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
+	end
 end
 
 local function MailboxBank_CheckMail(isCollectMoney)
@@ -102,7 +104,7 @@ local function MailboxBank_CheckMail(isCollectMoney)
 					local name, itemTexture, count, quality, canUse = GetInboxItem(mailIndex, itemIndex)
 					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
 					if itemLink then
-						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, canUse)
+						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned)
 					end
 				end
 			end
@@ -587,21 +589,20 @@ end
 
 ---- Event ----
 local function MailboxBank_HookSendMail(recipient, subject, body)
-	sendItemInfo = {}
-	for i = 1 , ATTACHMENTS_MAX_RECEIVE do
-		local Name, _, count, _ = GetSendMailItem(i)
-		if Name then
-			local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-			sendItemInfo[i] = {}
-			sendItemInfo[i].count = count
-			sendItemInfo[i].itemLink = itemLink
-		end
-	end
-	local isMyChar
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			if recipient..'-'..E.myrealm == k then
-				isMyChar = true
+				for i = ATTACHMENTS_MAX_RECEIVE, 1, -1 do
+					local Name, _, count, _ = GetSendMailItem(i)
+					if Name then
+						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
+						MailboxBank_AddItem(E.myname, itemLink, count, 31, 1, i, nil, k)
+					end
+				end
+				if MailboxBankFrame:IsVisible() and selectValue == k then
+					MailboxBank_Update(true)
+				end
+				break
 			end
 		end
 	end
