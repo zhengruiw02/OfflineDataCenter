@@ -3,27 +3,26 @@
 --@@ TODO: function SortDB must clear up! collect garbage !!!
 	--UC..
 --@@ TODO: add searching bar!
-
+	--UC..almost done!
+	--TODO: change frame's layout!
+	
 --@@ TODO: add AH ordering
 	--UC..bad to do
 --@@ TODO: should stacked attachments can be collect??
 
---@@ TODO: collect mailbox gold??
-	--DONE!
---@@ TODO: should attachments info be saved to database when sending to known player's other characters?
-	--DONE!
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 
 --@@ TODO: localization!
 
-local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
+--local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
+local E, L, _, _, _, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
-local match, join, format = string.match, string.join, string.format
+local len, sub, find, format, join, match = string.len, string.sub, string.find, string.format, string.join, string.match
 local playername = E.myname..'-'..E.myrealm
 local selectValue = playername
-local slotDB, sendItemInfo
+local slotDB
 
 local MailboxBank_config_init = {
 	daysLeftYellow = 5,
@@ -33,7 +32,7 @@ local MailboxBank_config_init = {
 	numItemsPerRow = 8,
 	numItemsRows = 10,
 	itemsSlotDisplay = 80,
-	topOffset = 40,
+	topOffset = 60,
 	leftOffset = 8,
 	frameWidth = 350,
 	frameHeight = 500,
@@ -98,12 +97,10 @@ local function MailboxBank_CheckMail(isCollectMoney)
 					sender = "----" 
 					--return false
 				end
-				-- if wasRead then hasItem = ATTACHMENTS_MAX_RECEIVE end
-				-- for itemIndex = 1, hasItem do
 				for itemIndex = 1, ATTACHMENTS_MAX_RECEIVE do
-					local name, itemTexture, count, quality, canUse = GetInboxItem(mailIndex, itemIndex)
 					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
 					if itemLink then
+						local _, _, count, _, _ = GetInboxItem(mailIndex, itemIndex)
 						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned)
 					end
 				end
@@ -114,23 +111,44 @@ local function MailboxBank_CheckMail(isCollectMoney)
 	--return true
 end
 
-local function FormatMoney(money)
-	--if money == 0 or not money then return 0 end
-	local copperFormatter = join("", "%d", L.copperabbrev)
-	local silverFormatter = join("", "%d", L.silverabbrev, " %.2d", L.copperabbrev)
-	local goldFormatter =  join("", "%s", L.goldabbrev, " %.2d", L.silverabbrev, " %.2d", L.copperabbrev)
-	local gold, silver, copper = floor(abs(money / 10000)), abs(mod(money / 100, 100)), abs(mod(money, 100))
-	if gold ~= 0 then
-		if gold > 999 then
-			return format("%s"..L.goldabbrev, BreakUpLargeNumbers(gold))
-		else
-			return format(goldFormatter, BreakUpLargeNumbers(gold), silver, copper)
-		end		
-	elseif silver ~= 0 then
-		return format(silverFormatter, silver, copper)
-	else
-		return format(copperFormatter, copper)
+local function MailboxBank_SearchReset()
+	MailboxBank_UpdateContainer(nil)
+end
+
+local function MailboxBank_UpdateSearch()
+	local f = MailboxBankFrame
+	local MIN_REPEAT_CHARACTERS = 3;
+	local searchString = f.searchingBar:GetText();
+	if (len(searchString) > MIN_REPEAT_CHARACTERS) then
+		local repeatChar = true;
+		for i=1, MIN_REPEAT_CHARACTERS, 1 do 
+			if ( sub(searchString,(0-i), (0-i)) ~= sub(searchString,(-1-i),(-1-i)) ) then
+				repeatChar = false;
+				break;
+			end
+		end
+		if ( repeatChar ) then
+			MailboxBank_SearchBarResetAndClear(self);
+			return;
+		end
 	end
+	MailboxBank_UpdateContainer(searchString);
+end
+
+local function MailboxBank_OpenEditbox()
+	local f = MailboxBankFrame
+	f.searchingBarText:Hide();
+	f.searchingBar:Show();
+	f.searchingBar:SetText(SEARCH);
+	f.searchingBar:HighlightText();
+end
+
+local function MailboxBank_SearchBarResetAndClear()
+	local f = MailboxBankFrame
+	f.searchingBarText:Show();
+	
+	f.searchingBar:ClearFocus();
+	MailboxBank_SearchReset();
 end
 
 local function MailboxBank_CollectMoney()
@@ -138,7 +156,7 @@ local function MailboxBank_CollectMoney()
 end
 
 function MailboxBank_SortDB()
---@@  TODO: clear up! collect grabage
+--@@  TODO: clear up! collect garbage
 	local numItems = MB_DB[selectValue].itemCount
 	local usedSlot = 0
 	slotDB = {}
@@ -220,7 +238,9 @@ function MailboxBank_SortDB()
 			slot.sender = {}
 			slot.dayLeft = {}
 			slot.countNum = {}
-			slot.wasReturned = {}
+			slot.wasReturned = nil
+			slot.mailIndex = nil
+			slot.itemIndex = nil
 			if selectValue == playername and not MB_config.isStacked then
 				slot.mailIndex = MB_DB[selectValue][itemIndexCount].mailIndex
 				slot.itemIndex = MB_DB[selectValue][itemIndexCount].itemIndex
@@ -276,7 +296,6 @@ local function MailboxBank_CreatFrame(name)
 	f:SetWidth(MB_config.frameWidth)
 	f:SetHeight(MB_config.frameHeight)
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
-	--f:SetPoint("CENTER", 0, 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:RegisterForClicks("AnyUp");
@@ -307,6 +326,49 @@ local function MailboxBank_CreatFrame(name)
 	end)
 	E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
 	
+	----Search
+	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
+	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
+	f.searchingBar:CreateBackdrop('Default', true);
+	f.searchingBar:Height(15);
+	f.searchingBar:Width(200);
+	f.searchingBar:Hide();
+	f.searchingBar:Point('TOPLEFT', f, 'TOPLEFT', 8, -40);
+	--f.searchingBar:Point('TOPLEFT', f, 'TOPLEFT', 120, 60);
+	f.searchingBar:SetAutoFocus(true);
+	f.searchingBar:SetScript("OnEscapePressed", MailboxBank_SearchBarResetAndClear);
+	f.searchingBar:SetScript("OnEnterPressed", MailboxBank_SearchBarResetAndClear);
+	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
+	f.searchingBar:SetScript("OnEditFocusGained", f.searchingBar.HighlightText);
+	f.searchingBar:SetScript("OnTextChanged", MailboxBank_UpdateSearch);
+	f.searchingBar:SetScript('OnChar', MailboxBank_UpdateSearch);
+	f.searchingBar:SetText(SEARCH);
+	f.searchingBar:FontTemplate();
+
+	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
+	f.searchingBarText:FontTemplate();
+	f.searchingBarText:SetAllPoints(f.searchingBar);
+	f.searchingBarText:SetJustifyH("LEFT");
+	f.searchingBarText:SetText("|cff9999ff" .. SEARCH);
+		
+	local button = CreateFrame("Button", nil, f)
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+	button:SetAllPoints(f.searchingBarText);
+	button:SetScript("OnClick", function(f, btn)
+		if btn == "RightButton" then
+			MailboxBank_OpenEditbox();
+		else
+			if f:GetParent().searchingBar:IsShown() then
+				f:GetParent().searchingBar:Hide();
+				f:GetParent().searchingBar:ClearFocus();
+				f:GetParent().searchingBarText:Show();
+				MailboxBank_SearchReset();
+			else
+				MailboxBank_OpenEditbox();
+			end
+		end
+	end)
+	
 	----Create collect mailbox gold button
 	f.CollectGoldButton = CreateFrame("Button", name.."CollectGoldButton", f, "UIPanelButtonTemplate");
 	f.CollectGoldButton:SetWidth(100)
@@ -329,7 +391,7 @@ local function MailboxBank_CreatFrame(name)
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, name)
 	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
-	chooseChar:Point("TOPLEFT", 80, -6)
+	chooseChar:Point("TOPLEFT", f, 80, -6)
 	E.Skins:HandleDropDownBox(chooseChar, 180)
 	f.chooseChar = chooseChar
 	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
@@ -349,18 +411,15 @@ local function MailboxBank_CreatFrame(name)
 		MailboxBank_Update()
 		--MailboxBank_Update(true)
 	end)
-	
-	--f.scrollBar:SetScript("OnMouseWheel", function(self, delta)
-	--	collectgarbage()
-    --  DEFAULT_CHAT_FRAME:AddMessage(delta)
-	--end)
 	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
 	
 	----Create Container
 	local containerID = 1
 	f.Container = {}
 	f.Container[containerID] = CreateFrame('Frame', name..'Container'..containerID, f);
-	f.Container[containerID]:SetID(containerID);
+	--f.Container[containerID]:SetID(containerID);
+	f.Container[containerID]:Point('TOPLEFT', f, 'TOPLEFT', 8, -64);
+	f.Container[containerID]:Point('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container[containerID]:Show()
 	
 	--f.scrollBar:SetScrollChild(f.Container[containerID])
@@ -407,7 +466,8 @@ local function MailboxBank_CreatFrame(name)
 				slot:Point('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:Point('TOPLEFT', f, 'TOPLEFT', MB_config.leftOffset, -MB_config.topOffset);
+			slot:Point('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
+			--slot:Point('TOPLEFT', f, 'TOPLEFT',MB_config.leftOffset, -MB_config.topOffset);
 			lastRowButton = f.Container[containerID][i];
 			numContainerRows = numContainerRows + 1;
 		end
@@ -518,7 +578,7 @@ function MailboxBank_SlotClick(self,button)
 
 end
 
-function MailboxBank_UpdateContainer()
+function MailboxBank_UpdateContainer(searchingStr)
 	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
 	local containerID = 1
 	for i = 1, MB_config.itemsSlotDisplay do
@@ -529,7 +589,7 @@ function MailboxBank_UpdateContainer()
 	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
 	if not slotDB then return end
 	
-	f.mailboxGoldText:SetText("郵箱金幣: "..FormatMoney(MB_DB[selectValue].money))
+	f.mailboxGoldText:SetText("郵箱金幣: "..GetCoinTextureString(MB_DB[selectValue].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectValue].checkMailTick)/60).." 分鐘前掃描" or "");
 
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
@@ -551,13 +611,9 @@ function MailboxBank_UpdateContainer()
 		slot.dayleft = slotDB[itemID].dayLeft
 		slot.countnum = slotDB[itemID].countNum
 		
-		if slotDB[itemID].mailIndex and slotDB[itemID].itemIndex then
-			slot.mailIndex = slotDB[itemID].mailIndex
-			slot.itemIndex = slotDB[itemID].itemIndex
-		end
-		if slotDB[itemID].wasReturned then
-			slot.wasReturned = slotDB[itemID].wasReturned
-		end
+		slot.mailIndex = slotDB[itemID].mailIndex
+		slot.itemIndex = slotDB[itemID].itemIndex
+		slot.wasReturned = slotDB[itemID].wasReturned
 		
 		if slot.link then
 			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
@@ -570,6 +626,14 @@ function MailboxBank_UpdateContainer()
 			slot.tex:SetTexture(slot.texture)
 		else
 			slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
+		end
+		
+		slot.tex:SetVertexColor(1, 1, 1)
+		if f.searchingBar:HasFocus() then
+			if not find(slot.name, searchingStr) then
+				slot.tex:SetVertexColor(0.25, 0.25, 0.25)
+				slot:SetBackdropBorderColor(unpack(E.media.bordercolor))
+			end
 		end
 		
 		local countnum = 0
@@ -609,7 +673,6 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 end
 
 local function MailboxBank_Show()
-	--selectValue = playername;
 	MailboxBankFrame:Show()
 end
 
@@ -643,13 +706,6 @@ local function MailboxBank_OnEvent(self, event, args)
 		MailboxBank_CreatFrame("MailboxBankFrame")
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
-	-- if event == "MAIL_SEND_INFO_UPDATE" then
-		-- MailboxBank_MailSendInfoUpdate()
-		-- print(event)
-	-- end
-	-- if event == "MAIL_SEND_SUCCESS" then
-		-- print(event)
-	-- end
 end
 
 local MailboxBank_Event = CreateFrame("Frame")
@@ -658,8 +714,6 @@ MailboxBank_Event:RegisterEvent("PLAYER_ENTERING_WORLD")
 MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 MailboxBank_Event:RegisterEvent("MAIL_SHOW")
 MailboxBank_Event:RegisterEvent("MAIL_CLOSED")
---MailboxBank_Event:RegisterEvent("MAIL_SEND_INFO_UPDATE")
---MailboxBank_Event:RegisterEvent("MAIL_SEND_SUCCESS")
 MailboxBank_Event:SetScript("OnEvent", MailboxBank_OnEvent)
 
 hooksecurefunc("SendMail", MailboxBank_HookSendMail)
