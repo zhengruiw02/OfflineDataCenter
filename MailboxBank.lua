@@ -136,7 +136,7 @@ local function MailboxBank_UpdateSearch()
 			return;
 		end
 	end
-	MailboxBank_UpdateContainer(searchString);
+	MailboxBank_UpdateContainer();
 end
 
 local function MailboxBank_OpenEditbox()
@@ -248,7 +248,7 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MailboxBank_SortDB(method)
+function MailboxBank_SortDB(method, args)
 --@@  TODO: clear up! collect garbage
 	if not method then method = "normal" end
 	local usedSlot = 0
@@ -262,7 +262,7 @@ function MailboxBank_SortDB(method)
 			
 			usedSlot = usedSlot + 1
 			
-			slot = SelectSortMethod[method](usedSlot)
+			slot = SelectSortMethod[method](usedSlot, args)
 			---
 			--slotDB[usedSlot] = {} --!!
 			--slot = slotDB[usedSlot] --!! must to calc to correct slot
@@ -331,6 +331,7 @@ local function MailboxBank_CreatFrame(name)
 	f.closeButton = CreateFrame("Button", name.."CloseButton", f, "UIPanelCloseButton");
 	f.closeButton:Point("TOPRIGHT", -2, -2);
 	f.closeButton:HookScript("OnClick", function()
+		MailboxBank_SearchBarResetAndClear()
 		collectgarbage("collect")
 	end)
 	E:GetModule("Skins"):HandleCloseButton(f.closeButton);
@@ -366,7 +367,10 @@ local function MailboxBank_CreatFrame(name)
 	f.searchingBar:SetScript("OnEscapePressed", MailboxBank_SearchBarResetAndClear);
 	f.searchingBar:SetScript("OnEnterPressed", MailboxBank_SearchBarResetAndClear);
 	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
-	f.searchingBar:SetScript("OnEditFocusGained", f.searchingBar.HighlightText);
+	f.searchingBar:SetScript("OnEditFocusGained", function(self)
+		self:HighlightText()
+		MailboxBank_UpdateSearch()
+	end);
 	f.searchingBar:SetScript("OnTextChanged", MailboxBank_UpdateSearch);
 	f.searchingBar:SetScript('OnChar', MailboxBank_UpdateSearch);
 	f.searchingBar:SetText(SEARCH);
@@ -417,8 +421,8 @@ local function MailboxBank_CreatFrame(name)
 	
 	----Create scroll frame
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
-	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
-	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 64)
+	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
+	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
 	f.scrollBar:Hide()
 	--f.scrollBar:EnableMouseWheel(true)
@@ -596,7 +600,7 @@ function MailboxBank_SlotClick(self,button)
 
 end
 
-function MailboxBank_UpdateContainer(searchingStr)
+function MailboxBank_UpdateContainer()
 	local f = MailboxBankFrame
 	local containerID = 1
 	for i = 1, MB_config.itemsSlotDisplay do
@@ -659,7 +663,7 @@ function MailboxBank_UpdateContainer(searchingStr)
 		end
 		if f.searchingBar:HasFocus() then
 			if not slot.name then break end
-			if not searchingStr then break end
+			local searchingStr = f.searchingBar:GetText();
 			if not find(slot.name, searchingStr) then
 				slot.tex:SetVertexColor(0.25, 0.25, 0.25)
 				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
@@ -717,6 +721,7 @@ end
 
 local function MailboxBank_Hide()
 	MailboxBankFrame:Hide()
+	MailboxBank_SearchBarResetAndClear()
 	collectgarbage("collect")
 end
 
