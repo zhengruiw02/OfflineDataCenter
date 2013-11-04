@@ -15,12 +15,12 @@
 --@@ TODO: clear searching bar when changing character 
 	--UC.. may finished
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
-local E, L, _, _, _, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
+local E = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local len, sub, find, format, join, match = string.len, string.sub, string.find, string.format, string.join, string.match
-local playername = E.myname..'-'..E.myrealm
+local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
 local slotDB
 
@@ -334,7 +334,6 @@ local function MailboxBank_CreatFrame(name)
 		MailboxBank_SearchBarResetAndClear()
 		collectgarbage("collect")
 	end)
-	E:GetModule("Skins"):HandleCloseButton(f.closeButton);
 	
 	----Create stack up button
 	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
@@ -344,13 +343,11 @@ local function MailboxBank_CreatFrame(name)
 		MB_config.isStacked = self:GetChecked()
 		MailboxBank_Update(true)
 	end)
-	E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
 
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, name)
 	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
 	chooseChar:Point("TOPLEFT", f, 80, -6)
-	E.Skins:HandleDropDownBox(chooseChar, 180)
 	f.chooseChar = chooseChar
 	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
 	
@@ -407,7 +404,6 @@ local function MailboxBank_CreatFrame(name)
 	f.CollectGoldButton:Point("BOTTOMLEFT", 10, 5);
 	f.CollectGoldButton:SetText("收取金幣")
 	f.CollectGoldButton:SetScript("OnClick", MailboxBank_CollectMoney)
-	E:GetModule("Skins"):HandleButton(f.CollectGoldButton)
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
@@ -432,9 +428,15 @@ local function MailboxBank_CreatFrame(name)
 	end)
 	f.scrollBar:SetScript("OnShow", function()
 		MailboxBank_Update()
-		--MailboxBank_Update(true)
 	end)
-	E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
+	
+	if E then
+		E:GetModule("Skins"):HandleCloseButton(f.closeButton);
+		E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
+		E.Skins:HandleDropDownBox(chooseChar, 180)
+		E:GetModule("Skins"):HandleButton(f.CollectGoldButton)
+		E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
+	end
 	
 	----Create Container
 	local containerID = 1
@@ -643,11 +645,13 @@ function MailboxBank_UpdateContainer()
 				local r, g, b = GetItemQualityColor(slot.rarity);
 				slot:SetBackdropBorderColor(r, g, b);
 			else
-				slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
+				--slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
+				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 			end
 			slot.tex:SetTexture(slot.texture)
 		else
-			slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
+			--slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
+			slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 		end
 		
 		local countnum = 0
@@ -698,12 +702,12 @@ end
 local function MailboxBank_HookSendMail(recipient, subject, body)
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
-			if recipient..'-'..E.myrealm == k then
+			if recipient..'-'..GetRealmName() == k then
 				for i = ATTACHMENTS_MAX_RECEIVE, 1, -1 do
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
 						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						MailboxBank_AddItem(E.myname, itemLink, count, 31, 1, i, 0, nil, k)
+						MailboxBank_AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, 0, nil, k)
 					end
 				end
 				if MailboxBankFrame:IsVisible() and selectValue == k then
@@ -745,7 +749,10 @@ local function MailboxBank_OnEvent(self, event, args)
 	if event == "PLAYER_ENTERING_WORLD" then
 		if MB_config == nil then
 			MB_config = {}
-			E:CopyTable(MB_config, MailboxBank_config_init)
+			for k ,v in pairs(MailboxBank_config_init) do
+				MB_config[k] = v;
+			end
+			--E:CopyTable(MB_config, MailboxBank_config_init)
 		end
 		if not MB_DB then MB_DB = {} end
 		MailboxBank_CreatFrame("MailboxBankFrame")
