@@ -1,19 +1,19 @@
 --@@ TODO: solve COD item, maybe displaying COD amount above the slot icon or using tool-tip
-
+	--UC..don't know how to layout in tool-tip..
 --@@ TODO: function SortDB must clear up! collect garbage !!!
-	--UC..
---@@ TODO: add searching bar!
-	--UC..almost done!
-	--TODO: change frame's layout!
-	
+	--done?
+--@@ TODO: change frame's layout!
+	--holy shit..
 --@@ TODO: add AH ordering
 	--UC..bad to do
 --@@ TODO: should stacked attachments can be collect??
-
+	--UC.. new window to produce? or pop-up ?
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
-
+	--UC.. should make new function to calculate deadline time?
 --@@ TODO: localization!
-
+	--UC..not today..
+--@@ TODO: clear searching bar when changing character 
+	--UC.. may finished
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 local E, L, _, _, _, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = E:NewModule("MailboxBank")
@@ -32,8 +32,6 @@ local MailboxBank_config_init = {
 	numItemsPerRow = 8,
 	numItemsRows = 10,
 	itemsSlotDisplay = 80,
-	topOffset = 60,
-	leftOffset = 8,
 	frameWidth = 350,
 	frameHeight = 500,
 	rowcount = 8,
@@ -45,27 +43,28 @@ local MailboxBank_config_init = {
 
 local itemTypes, itemSubTypes
 
--- local function BuildSortOrder()
-	-- itemTypes = {}
-	-- itemSubTypes = {}
-	-- for i, iType in ipairs({GetAuctionItemClasses()}) do
-		-- itemTypes[iType] = i
-		-- itemSubTypes[iType] = {}
-		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			-- itemSubTypes[iType][isType] = ii
-		-- end
-	-- end
--- end
+local function BuildSortOrder()
+	itemTypes = {}
+	itemSubTypes = {}
+	for i, iType in ipairs({GetAuctionItemClasses()}) do
+		itemTypes[iType] = i
+		itemSubTypes[iType] = {}
+		for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
+			itemSubTypes[iType][isType] = ii
+		end
+	end
+end
 
-local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned, recipient)
+local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, CODAmount, wasReturned, recipient)
 	local item = {}
 	item["sender"] = sender
 	item["count"] = count
 	item["itemLink"] = itemLink
 	item["daysLeft"] = daysLeft
 	item["mailIndex"] = mailIndex
-	item["itemIndex"] = itemIndex
-	item["wasReturned"] = wasReturned
+	item["attachIndex"] = attachIndex
+	if CODAmount > 0 then item["CODAmount"] = CODAmount end
+	if wasReturned then item["wasReturned"] = wasReturned end
 	if recipient then
 		tinsert(MB_DB[recipient], 1, item)
 		MB_DB[recipient].itemCount = MB_DB[recipient].itemCount + 1
@@ -76,6 +75,7 @@ local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex,
 end
 
 local function MailboxBank_CheckMail(isCollectMoney)
+	if isCollectMoney and MB_DB[playername].money == 0 then return end
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
@@ -90,18 +90,18 @@ local function MailboxBank_CheckMail(isCollectMoney)
 					MB_DB[playername].money = MB_DB[playername].money + money
 				end
 			end
-			if hasItem and CODAmount == 0 then
+			if hasItem then
 			--@@ TODO: solve COD item, maybe can display COD amount in the slot icon or tooltip
 				if sender == nil then
 					--sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
 					sender = "----" 
 					--return false
 				end
-				for itemIndex = 1, ATTACHMENTS_MAX_RECEIVE do
-					local itemLink = GetInboxItemLink(mailIndex, itemIndex)
+				for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
+					local itemLink = GetInboxItemLink(mailIndex, attachIndex)
 					if itemLink then
-						local _, _, count, _, _ = GetInboxItem(mailIndex, itemIndex)
-						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, itemIndex, wasReturned)
+						local _, _, count, _, _ = GetInboxItem(mailIndex, attachIndex)
+						MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, CODAmount, wasReturned)
 					end
 				end
 			end
@@ -111,8 +111,12 @@ local function MailboxBank_CheckMail(isCollectMoney)
 	--return true
 end
 
+local function MailboxBank_CalcDeadline()
+
+end
+
 local function MailboxBank_SearchReset()
-	MailboxBank_UpdateContainer(nil)
+	MailboxBank_UpdateContainer()
 end
 
 local function MailboxBank_UpdateSearch()
@@ -155,115 +159,130 @@ local function MailboxBank_CollectMoney()
 	MailboxBank_CheckMail(true)
 end
 
-function MailboxBank_SortDB()
---@@  TODO: clear up! collect garbage
-	local numItems = MB_DB[selectValue].itemCount
-	local usedSlot = 0
-	slotDB = {}
-	for itemIndexCount = 1, numItems do
-		local slot
-		if MB_config.isStacked then
-			for i = 1, usedSlot do
-				if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)")) then
-					slot = slotDB[i]
-				end
-			end
-		end	
-		if not slot then
-		--@@  TODO: add AH ordering
-			--[[if isAHOrder then ---- TODO: ordering as AH
-				if not itemTypes then BuildSortOrder() end
-				-- local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, itemSellPrice = GetItemInfo(itemLink)
-				if not ahOrdering then local ahOrdering = {} end
-				local _, _, _, _, _, itemType, itemSubType, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndex].itemLink)
-				local itemID = tonumber(match(MB_DB[selectValue][itemIndex].itemLink, "item:(%d+)"))
-				local ahIndex = itemTypes[itemType] * 100 + itemSubTypes[itemType][itemSubType]
-				local itemAHIndex = ahIndex * 1000000 + itemID
-				itemAHIndex = itemAHIndex * 1000 + 999 --  format: AABBIIIIIINN
-				
-				usedSlot = usedSlot + 1
-				for slotID, value in ipairs(ahOrdering) do
-					if slotID == getn(ahOrdering) then
-						if ((value mod 1000) == (itemAHIndex mod 1000) )then
-							ahOrdering[slotID + 1] = value + 1
-						else
-							ahOrdering[slotID + 1] = itemAHIndex - 999
-						end
-						
-						slotDB[slotID + 1] = {}
-						slot = slotDB[slotID + 1]
-						break
-					elseif slotID == 1 and ahOrdering[slotID] > itemAHIndex then
-						for i = getn(ahOrdering), slotID , -1 do -- move forward
-							ahOrdering[i + 1] = ahOrdering[i]
-						end
-						ahOrdering[slotID + 1] = itemAHIndex - 999
-						
-						slotDB[slotID + 1] = {}
-						slot = slotDB[slotID + 1]
-						break
-					elseif ((value < itemAHIndex) or (slotID == 1)) and ahOrdering[slotID + 1] > itemAHIndex then
-						for i = getn(ahOrdering), slotID + 1, -1 do -- move forward
-							ahOrdering[i + 1] = ahOrdering[i]
-						end
-						if (value mod 1000) == (itemAHIndex mod 1000) then
-							ahOrdering[slotID + 1] = value + 1
-						else
-							ahOrdering[slotID + 1] = itemAHIndex - 999
-						end
-						
-						slotDB[slotID + 1] = {}
-						slot = slotDB[slotID + 1]
-						break
-					end
-				end
-				
-			else
-				usedSlot = usedSlot + 1
-				slotDB[usedSlot] = {}
-				slot = slotDB[usedSlot]
-			end]]
+local function MailboxBank_InsertToRevIndexTable(RevsubDB, keyword)
 
+end
+
+local function MailboxBank_InsertToIndexTable(subDB, Type, subType, keyword)
+	if not subDB or not Type then return false end
+	----one-level and two-level are difference!!
+	if not subDB[RevsubDB[Type]] then
+	
+	elseif subType then
+		if not subDB[RevsubDB[Type]][RevsubsubDB[subType]] then
+		
+		else
+		
+		end
+	else
+	
+	end
+	
+	
+	----
+	for Index = 1, subDB.count do
+		if subDB[Index].value == Type then
+			for subIndex = 1, getn(subDB[subIndex]) - 1 do -- except value
 			
-			usedSlot = usedSlot + 1
-			--slotDB[usedSlot] = {}
-			--slot = slotDB[usedSlot]
-			
-			
-			slotDB[usedSlot] = {}
-			slot = slotDB[usedSlot]
-			
-			slot.link = MB_DB[selectValue][itemIndexCount].itemLink
-			slot.checkMailTick = MB_DB[selectValue].checkMailTick
-			slot.sender = {}
-			slot.dayLeft = {}
-			slot.countNum = {}
-			slot.wasReturned = nil
-			slot.mailIndex = nil
-			slot.itemIndex = nil
-			if selectValue == playername and not MB_config.isStacked then
-				slot.mailIndex = MB_DB[selectValue][itemIndexCount].mailIndex
-				slot.itemIndex = MB_DB[selectValue][itemIndexCount].itemIndex
-			end
-			if not MB_config.isStacked then
-			--@@  TODO: should attachments can be collected when items are stacked??
-				slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
 			end
 		end
+	end
+	--
+end
+
+local SelectSortMethod = {
+	["normal"] = function(usedSlot)
+		slotDB[usedSlot] = {}
+		return slotDB[usedSlot]
+	end,
+	["AH"] = function()
+		local keyword = "itemID"
+	
+	end,
+	["sender"] = function()
+		local keyword = "sender"
+	end,
+	["quality"] = function()
+		local keyword = "quality"
+	end,
+	["codOnly"] = function() 
+		local keyword = "sender"
+	end,
+}
+
+local function MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
+	for i = 1, usedSlot do
+		if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)")) then
+			return slotDB[i]
+		end
+	end
+	return nil
+end
+
+local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
+----TODO: merge checkMailTick and dayLeft to leftTick
+	if isInit then
+		slot.link = MB_DB[selectValue][itemIndexCount].itemLink
+		slot.checkMailTick = MB_DB[selectValue].checkMailTick
+		slot.sender = {}
+		slot.dayLeft = {}
+		slot.countNum = {}
+		slot.wasReturned = nil
+		slot.mailIndex = nil
+		slot.attachIndex = nil
+		if not MB_config.isStacked then
+			slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
+			slot.CODAmount = MB_DB[selectValue][itemIndexCount].CODAmount
+		end
+		return slot
+	end
+	if selectValue == playername then
+		if not slot.mailIndex then slot.mailIndex = {} end
+		if not slot.attachIndex then slot.attachIndex = {} end
+		tinsert(slot.mailIndex , MB_DB[selectValue][itemIndexCount].mailIndex)
+		tinsert(slot.attachIndex , MB_DB[selectValue][itemIndexCount].attachIndex)
+	end
+	tinsert(slot.sender , MB_DB[selectValue][itemIndexCount].sender)
+	tinsert(slot.dayLeft , MB_DB[selectValue][itemIndexCount].daysLeft)
+	tinsert(slot.countNum , MB_DB[selectValue][itemIndexCount].count)
+	return slot
+end
+
+function MailboxBank_SortDB(method)
+--@@  TODO: clear up! collect garbage
+	if not method then method = "normal" end
+	local usedSlot = 0
+	slotDB = {}
+	for itemIndexCount = 1, MB_DB[selectValue].itemCount do
+		local slot
+		if MB_config.isStacked then
+			slot = MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
+		end	
+		if not slot then
+			
+			usedSlot = usedSlot + 1
+			
+			slot = SelectSortMethod[method](usedSlot)
+			---
+			--slotDB[usedSlot] = {} --!!
+			--slot = slotDB[usedSlot] --!! must to calc to correct slot
+			
+			
+			
+			slot = MailboxBank_InsertToSortDB(slot, itemIndexCount, true)
+		end
 		
-		tinsert(slot.sender , MB_DB[selectValue][itemIndexCount].sender)
-		tinsert(slot.dayLeft , MB_DB[selectValue][itemIndexCount].daysLeft)
-		tinsert(slot.countNum , MB_DB[selectValue][itemIndexCount].count)
+		slot = MailboxBank_InsertToSortDB(slot, itemIndexCount)
 	end
 	slotDB.usedSlot = usedSlot
-	return slotDB
+	--return slotDB
 end
 
 ---- GUI ----
 function MailboxBank_ChooseChar_OnClick(self)
 	selectValue = self.value
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
-
+	MailboxBank_SearchBarResetAndClear()
 	MailboxBank_Update(true)
 	
 	local text = MailboxBankFrameDropDownText;
@@ -325,6 +344,14 @@ local function MailboxBank_CreatFrame(name)
 		MailboxBank_Update(true)
 	end)
 	E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
+
+	----Create choose char dropdown menu
+	tinsert(UISpecialFrames, name)
+	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
+	chooseChar:Point("TOPLEFT", f, 80, -6)
+	E.Skins:HandleDropDownBox(chooseChar, 180)
+	f.chooseChar = chooseChar
+	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
 	
 	----Search
 	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
@@ -388,14 +415,6 @@ local function MailboxBank_CreatFrame(name)
 	-- f.checktime:FontTemplate()
 	-- f.checktime:Point("BOTTOMLEFT", 20, 5);
 	
-	----Create choose char dropdown menu
-	tinsert(UISpecialFrames, name)
-	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
-	chooseChar:Point("TOPLEFT", f, 80, -6)
-	E.Skins:HandleDropDownBox(chooseChar, 180)
-	f.chooseChar = chooseChar
-	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
-
 	----Create scroll frame
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -40)
@@ -421,9 +440,6 @@ local function MailboxBank_CreatFrame(name)
 	f.Container[containerID]:Point('TOPLEFT', f, 'TOPLEFT', 8, -64);
 	f.Container[containerID]:Point('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container[containerID]:Show()
-	
-	--f.scrollBar:SetScrollChild(f.Container[containerID])
-	--f.Container[containerID].numSlots = 0;
 	
 	local numContainerRows = 0;
 	local lastButton;
@@ -467,7 +483,7 @@ local function MailboxBank_CreatFrame(name)
 			end
 		else
 			slot:Point('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
-			--slot:Point('TOPLEFT', f, 'TOPLEFT',MB_config.leftOffset, -MB_config.topOffset);
+			--slot:Point('TOPLEFT', f, 'TOPLEFT', 8, -60);
 			lastRowButton = f.Container[containerID][i];
 			numContainerRows = numContainerRows + 1;
 		end
@@ -570,8 +586,10 @@ function MailboxBank_SlotClick(self,button)
 			ChatFrame1EditBox:Hide();
 		end
 	elseif button == 'LeftButton' then
-		if self.mailIndex and self.itemIndex then
-			TakeInboxItem(self.mailIndex, self.itemIndex)
+		if self.mailIndex and self.attachIndex then
+			for i = 1 , getn(self[mailIndex]) do
+				TakeInboxItem(self[mailIndex][i], self[attachIndex][i])
+			end
 			MailboxBank_Update(true)
 		end
 	end
@@ -579,7 +597,7 @@ function MailboxBank_SlotClick(self,button)
 end
 
 function MailboxBank_UpdateContainer(searchingStr)
-	local f = MailboxBankFrame --or MailboxBank_CreatFrame("MailboxBankFrame");
+	local f = MailboxBankFrame
 	local containerID = 1
 	for i = 1, MB_config.itemsSlotDisplay do
 		if f.Container[containerID][i] then
@@ -602,18 +620,18 @@ function MailboxBank_UpdateContainer(searchingStr)
 	end
 	
 	for i = 1, iconDisplayCount do
-		local itemID = i + offset * 8
+		local itemIndex = i + offset * 8
 		
 		local slot = f.Container[containerID][i]
-		slot.link = slotDB[itemID].link
-		slot.checkMailTick = slotDB[itemID].checkMailTick
-		slot.sender = slotDB[itemID].sender
-		slot.dayleft = slotDB[itemID].dayLeft
-		slot.countnum = slotDB[itemID].countNum
+		slot.link = slotDB[itemIndex].link
+		slot.checkMailTick = slotDB[itemIndex].checkMailTick
+		slot.sender = slotDB[itemIndex].sender
+		slot.dayleft = slotDB[itemIndex].dayLeft
+		slot.countnum = slotDB[itemIndex].countNum
 		
-		slot.mailIndex = slotDB[itemID].mailIndex
-		slot.itemIndex = slotDB[itemID].itemIndex
-		slot.wasReturned = slotDB[itemID].wasReturned
+		slot.mailIndex = slotDB[itemIndex].mailIndex
+		slot.attachIndex = slotDB[itemIndex].attachIndex
+		slot.wasReturned = slotDB[itemIndex].wasReturned
 		
 		if slot.link then
 			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
@@ -628,19 +646,27 @@ function MailboxBank_UpdateContainer(searchingStr)
 			slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
 		end
 		
-		slot.tex:SetVertexColor(1, 1, 1)
-		if f.searchingBar:HasFocus() then
-			if not find(slot.name, searchingStr) then
-				slot.tex:SetVertexColor(0.25, 0.25, 0.25)
-				slot:SetBackdropBorderColor(unpack(E.media.bordercolor))
-			end
-		end
-		
 		local countnum = 0
 		for i = 1 , getn(slot.countnum) do
 			countnum = countnum + slot.countnum[i]
 		end
 		slot.count:SetText(countnum > 1 and countnum or '');
+		
+		slot.tex:SetVertexColor(1, 1, 1)
+		slot.count:SetTextColor(1, 1, 1)
+		if slot.CODAmount then
+			slot.tex:SetDesaturated(1)
+		end
+		if f.searchingBar:HasFocus() then
+			if not slot.name then break end
+			if not searchingStr then break end
+			if not find(slot.name, searchingStr) then
+				slot.tex:SetVertexColor(0.25, 0.25, 0.25)
+				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
+				slot.count:SetTextColor(0.3, 0.3, 0.3)
+			end
+		end
+
 		slot:Show()
 	end
 	FauxScrollFrame_Update(f.scrollBar, ceil(slotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
@@ -651,7 +677,20 @@ function MailboxBank_Update(isSortDB)
 	MailboxBank_UpdateContainer()
 end
 
----- Event ----
+function MailboxBank_AlertDeadlineMails()
+	if not MB_DB[playername] then return end
+	--local DeadlineList = {}
+	for i = MB_DB[playername].itemCount , 1, -1 do
+		local dayLeft = floor(difftime(floor(MB_DB[playername][i].daysLeft * 86400) + MB_DB[playername].checkMailTick,time()) / 86400)
+		if dayLeft < 3 then
+			print("|cffff0000您的邮箱有快到期的附件|r"..MB_DB[playername][i].itemLink.."|cffff0000（还剩不足|r"..(dayLeft+1).."|cffff0000天），请注意查收|r")
+			return
+		else
+			return
+		end
+	end
+end
+
 local function MailboxBank_HookSendMail(recipient, subject, body)
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
@@ -660,7 +699,7 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
 						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						MailboxBank_AddItem(E.myname, itemLink, count, 31, 1, i, nil, k)
+						MailboxBank_AddItem(E.myname, itemLink, count, 31, 1, i, 0, nil, k)
 					end
 				end
 				if MailboxBankFrame:IsVisible() and selectValue == k then
@@ -681,6 +720,7 @@ local function MailboxBank_Hide()
 	collectgarbage("collect")
 end
 
+---- Event ----
 local function MailboxBank_OnEvent(self, event, args)
 	if event == "MAIL_INBOX_UPDATE" then
 		MailboxBank_CheckMail()
@@ -704,6 +744,7 @@ local function MailboxBank_OnEvent(self, event, args)
 		end
 		if not MB_DB then MB_DB = {} end
 		MailboxBank_CreatFrame("MailboxBankFrame")
+		MailboxBank_AlertDeadlineMails()
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
 end
