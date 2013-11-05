@@ -304,6 +304,12 @@ function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
+	if not FontTemplate then
+		local FontTemplate = function()
+		
+		
+		end
+	end
 	self.MB_Frame = CreateFrame("Frame", nil , UIParent)
 	local f = self.MB_Frame
 	f:SetParent(self)
@@ -369,15 +375,6 @@ function MB:CreatMailboxBankFrame()
 	f.searchingBarText:SetText("|cff9999ff" .. SEARCH);
 	
 	f.searchingBar:SetAutoFocus(true);
-	f.searchingBar:SetScript("OnEscapePressed", f:GetParent():SearchBarResetAndClear());
-	f.searchingBar:SetScript("OnEnterPressed", f:GetParent():SearchBarResetAndClear());
-	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar:Hide());
-	f.searchingBar:SetScript("OnEditFocusGained", function(self)
-		self:HighlightText()
-		f:GetParent():UpdateSearch()
-	end);
-	f.searchingBar:SetScript("OnTextChanged", f:GetParent():UpdateSearch());
-	f.searchingBar:SetScript('OnChar', f:GetParent():UpdateSearch());
 	f.searchingBar:SetText(SEARCH);
 	--f.searchingBar:FontTemplate();
 	f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12)
@@ -403,7 +400,7 @@ function MB:CreatMailboxBankFrame()
 	print(f.chooseChar)
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
 	--print(self:DropDownMenuInitialize())
-	UIDropDownMenu_Initialize(chooseChar, f:GetParent():DropDownMenuInitialize());
+	UIDropDownMenu_Initialize(f.chooseChar, f:GetParent():DropDownMenuInitialize());
 	
 	----Create collect mailbox gold button
 	f.CollectGoldButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate");
@@ -411,11 +408,12 @@ function MB:CreatMailboxBankFrame()
 	f.CollectGoldButton:SetHeight(30)
 	f.CollectGoldButton:SetPoint("BOTTOMLEFT", 10, 5);
 	f.CollectGoldButton:SetText(L["Collect gold"])
-	f.CollectGoldButton:SetScript("OnClick", f:GetParent():CollectMoney())
+
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
-	f.mailboxGoldText:FontTemplate()
+	--f.mailboxGoldText:FontTemplate()
+	f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 12)
 	f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	
 	----Create check time text
@@ -430,13 +428,7 @@ function MB:CreatMailboxBankFrame()
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
 	f.scrollBar:Hide()
 	--f.scrollBar:EnableMouseWheel(true)
-	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
-		f:GetParent():Update()
-	end)
-	f.scrollBar:SetScript("OnShow", function()
-		f:GetParent():Update()
-	end)
+
 	
 	if E then
 		local S = E:GetModule("Skins")
@@ -467,7 +459,8 @@ function MB:CreatMailboxBankFrame()
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
-		slot.count:FontTemplate()
+		--slot.count:FontTemplate()
+		slot.count:SetFont(STANDARD_TEXT_FONT, 12)
 		slot.count:SetPoint('BOTTOMRIGHT', 0, 2);
 		
 		slot.tex = slot:CreateTexture(nil, "OVERLAY", nil)
@@ -504,6 +497,28 @@ function MB:CreatMailboxBankFrame()
 		lastButton = f.Container[i];
 	end
 	
+	
+	---- SetScript
+	
+	f.searchingBar:SetScript("OnEscapePressed", f:GetParent():SearchBarResetAndClear());
+	f.searchingBar:SetScript("OnEnterPressed", f:GetParent():SearchBarResetAndClear());
+	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar:Hide());
+	f.searchingBar:SetScript("OnEditFocusGained", function(self)
+		self:HighlightText()
+		f:GetParent():UpdateSearch()
+	end);
+	f.searchingBar:SetScript("OnTextChanged", f:GetParent():UpdateSearch());
+	f.searchingBar:SetScript('OnChar', f:GetParent():UpdateSearch());
+	
+	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
+		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
+		f:GetParent():Update()
+	end)
+	f.scrollBar:SetScript("OnShow", function()
+		f:GetParent():Update()
+	end)
+	
+	f.CollectGoldButton:SetScript("OnClick", f:GetParent():CollectMoney())
 	-- return f
 end
 
