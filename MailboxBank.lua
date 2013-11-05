@@ -13,7 +13,6 @@
 --@@ TODO: localization!
 	--UC.. done?
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
-local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank")
 local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
@@ -21,6 +20,9 @@ local len, sub, find, format, join, match = string.len, string.sub, string.find,
 local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
 local slotDB
+
+local MB = CreateFrame("Frame")
+MB:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 local MB.Config_INIT = {
 	daysLeftYellow = 5,
@@ -39,16 +41,16 @@ local MB.Config_INIT = {
 	isStacked = false,
 }	
 
-local itemTypes, itemSubTypes
+local MB.itemTypes, MB.itemSubTypes
 
-local function BuildSortOrder()
-	itemTypes = {}
-	itemSubTypes = {}
+local function MB:BuildAHOrder()
+	self.itemTypes = {}
+	self.itemSubTypes = {}
 	for i, iType in ipairs({GetAuctionItemClasses()}) do
-		itemTypes[iType] = i
-		itemSubTypes[iType] = {}
+		self.itemTypes[iType] = i
+		self.itemSubTypes[iType] = {}
 		for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			itemSubTypes[iType][isType] = ii
+			self.itemSubTypes[iType][isType] = ii
 		end
 	end
 end
@@ -72,7 +74,7 @@ local function MB:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIn
 	end
 end
 
-local function MB:CheckMail(isCollectMoney)
+local function MB.CheckMail(isCollectMoney)
 	if isCollectMoney and MB_DB[playername].money == 0 then return end
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
@@ -109,16 +111,16 @@ local function MB:CheckMail(isCollectMoney)
 	--return true
 end
 
-local function MailboxBank_CalcDeadline()
+local function MB:CalcDeadline()
 
 end
 
 local function MB:SearchReset()
-	self:UpdateContainer()
+	self.UpdateContainer()
 end
 
 local function MB:UpdateSearch()
-	local f = MailboxBankFrame
+	local f = self.MB_Frame
 	local MIN_REPEAT_CHARACTERS = 3;
 	local searchString = f.searchingBar:GetText();
 	if (len(searchString) > MIN_REPEAT_CHARACTERS) then
@@ -134,11 +136,11 @@ local function MB:UpdateSearch()
 			return;
 		end
 	end
-	MB:UpdateContainer();
+	self.UpdateContainer();
 end
 
 local function MB:OpenEditbox()
-	local f = MailboxBankFrame
+	local f = self.MB_Frame
 	f.searchingBarText:Hide();
 	f.searchingBar:Show();
 	f.searchingBar:SetText(SEARCH);
@@ -146,15 +148,15 @@ local function MB:OpenEditbox()
 end
 
 local function MB:SearchBarResetAndClear()
-	local f = MailboxBankFrame
+	local f = self.MB_Frame
 	f.searchingBarText:Show();
 	
 	f.searchingBar:ClearFocus();
-	MB:SearchReset();
+	self.SearchReset();
 end
 
-local function MB:CollectMoney()
-	MB:CheckMail(true)
+local function MB.CollectMoney()
+	self.CheckMail(true)
 end
 
 local function MB:InsertToRevIndexTable(RevsubDB, keyword)
@@ -246,7 +248,7 @@ local function MB:InsertToSortDB(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MB:SortDB(method, args)
+local function MB.SortDB(method, args)
 --@@  TODO: clear up! collect garbage
 	if not method then method = "normal" end
 	local usedSlot = 0
@@ -272,11 +274,11 @@ function MB:SortDB(method, args)
 end
 
 ---- GUI ----
-function MB:ChooseChar_OnClick(self)
+local function MB:ChooseChar_OnClick(self)
 	selectValue = self.value
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
-	MB:SearchBarResetAndClear()
-	MB:Update(true)
+	self:GetParent():SearchBarResetAndClear()
+	self:GetParent().Update(true)
 	
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
@@ -290,7 +292,7 @@ local function MB:DropDownMenuInitialize()
 			info = UIDropDownMenu_CreateInfo()
 			info.text = k
 			info.value = k
-			info.func = MB:ChooseChar_OnClick;
+			info.func = self:ChooseChar_OnClick;
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
@@ -300,11 +302,12 @@ local function MB:DropDownMenuInitialize()
 	MailboxBankFrameDropDown:SetWidth(width+60)
 end
 
-function MB:CreatMailboxBankFrame(name)
+local function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
-	local f = CreateFrame("Frame", name, UIParent)
+	self.MB_Frame = CreateFrame("Frame", nil , UIParent)
+	local f = self.MB_Frame
 	if E then
 		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
 	else
@@ -333,7 +336,7 @@ function MB:CreatMailboxBankFrame(name)
 	f:Hide()
 	
 	----Create close button
-	f.closeButton = CreateFrame("Button", name.."CloseButton", f, "UIPanelCloseButton");
+	f.closeButton = CreateFrame("Button", nil, "UIPanelCloseButton");
 	f.closeButton:Point("TOPRIGHT", -2, -2);
 	f.closeButton:HookScript("OnClick", function()
 		MB:SearchBarResetAndClear()
@@ -341,22 +344,22 @@ function MB:CreatMailboxBankFrame(name)
 	end)
 	
 	----Create stack up button
-	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
+	f.stackUpCheckButton = CreateFrame("CheckButton", nil, "UICheckButtonTemplate");
 	f.stackUpCheckButton:Point("TOPLEFT", 2, -2)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
-		MB:Update(true)
+		self:GetParent().Update(true)
 	end)
 
 	----Create choose char dropdown menu
-	tinsert(UISpecialFrames, name)
-	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
+	--tinsert(UISpecialFrames, name)
+	f.chooseChar = CreateFrame('Frame', nil, 'UIDropDownMenuTemplate')
 	f.chooseChar:Point("TOPLEFT", f, 80, -6)
 	UIDropDownMenu_Initialize(chooseChar, MB:DropDownMenuInitialize);
 	
 	----Search
-	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
+	f.searchingBar = CreateFrame('EditBox', nil, f);
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	f.searchingBar:CreateBackdrop('Default', true);
 	f.searchingBar:Height(15);
@@ -370,10 +373,10 @@ function MB:CreatMailboxBankFrame(name)
 	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
 	f.searchingBar:SetScript("OnEditFocusGained", function(self)
 		self:HighlightText()
-		MB:UpdateSearch()
+		self:GetParent():GetParent().UpdateSearch()
 	end);
-	f.searchingBar:SetScript("OnTextChanged", MB:UpdateSearch);
-	f.searchingBar:SetScript('OnChar', MB:UpdateSearch);
+	f.searchingBar:SetScript("OnTextChanged", self:GetParent():GetParent().UpdateSearch);
+	f.searchingBar:SetScript('OnChar', self:GetParent():GetParent().UpdateSearch);
 	f.searchingBar:SetText(SEARCH);
 	f.searchingBar:FontTemplate();
 
@@ -388,26 +391,26 @@ function MB:CreatMailboxBankFrame(name)
 	button:SetAllPoints(f.searchingBarText);
 	button:SetScript("OnClick", function(f, btn)
 		if btn == "RightButton" then
-			MB:OpenEditbox();
+			f:GetParent():OpenEditbox();
 		else
 			if f:GetParent().searchingBar:IsShown() then
 				f:GetParent().searchingBar:Hide();
 				f:GetParent().searchingBar:ClearFocus();
 				f:GetParent().searchingBarText:Show();
-				MB:SearchReset();
+				f:GetParent():SearchReset();
 			else
-				MB:OpenEditbox();
+				f:GetParent():OpenEditbox();
 			end
 		end
 	end)
 	
 	----Create collect mailbox gold button
-	f.CollectGoldButton = CreateFrame("Button", name.."CollectGoldButton", f, "UIPanelButtonTemplate");
+	f.CollectGoldButton = CreateFrame("Button", nil, "UIPanelButtonTemplate");
 	f.CollectGoldButton:SetWidth(100)
 	f.CollectGoldButton:SetHeight(30)
 	f.CollectGoldButton:Point("BOTTOMLEFT", 10, 5);
 	f.CollectGoldButton:SetText(L["Collect gold"])
-	f.CollectGoldButton:SetScript("OnClick", MB:CollectMoney)
+	f.CollectGoldButton:SetScript("OnClick", self:GetParent():GetParent().CollectMoney)
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
@@ -420,7 +423,7 @@ function MB:CreatMailboxBankFrame(name)
 	-- f.checktime:Point("BOTTOMLEFT", 20, 5);
 	
 	----Create scroll frame
-	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
+	f.scrollBar = CreateFrame("ScrollFrame", nil, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
@@ -428,10 +431,10 @@ function MB:CreatMailboxBankFrame(name)
 	--f.scrollBar:EnableMouseWheel(true)
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
 		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
-		MB:Update()
+		self:GetParent():GetParent().Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
-		MB:Update()
+		self:GetParent():GetParent().Update()
 	end)
 	
 	if E then
@@ -446,19 +449,16 @@ function MB:CreatMailboxBankFrame(name)
 	end
 	
 	----Create Container
-	local containerID = 1
-	f.Container = {}
-	f.Container[containerID] = CreateFrame('Frame', name..'Container'..containerID, f);
-	--f.Container[containerID]:SetID(containerID);
-	f.Container[containerID]:Point('TOPLEFT', f, 'TOPLEFT', 8, -64);
-	f.Container[containerID]:Point('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
-	f.Container[containerID]:Show()
+	f.Container = CreateFrame('Frame', nil, f);
+	f.Container:Point('TOPLEFT', f, 'TOPLEFT', 8, -64);
+	f.Container:Point('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
+	f.Container:Show()
 	
 	local numContainerRows = 0;
 	local lastButton;
 	local lastRowButton;
 	for i = 1, MB_config.itemsSlotDisplay do
-		local slot = CreateFrame('Button', name..'Container'..containerID..'Slot'..i, f.Container[containerID]);
+		local slot = CreateFrame('Button', nil, f.Container);
 		slot:Hide()
 		slot:SetTemplate('Default');
 		slot:StyleButton();
@@ -475,38 +475,40 @@ function MB:CreatMailboxBankFrame(name)
 		slot.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
 		
 		slot:SetScript("OnEnter", function(self)
+			--self:GetParent():GetParent():GetParent():TooltipShow(self)
 			MB:TooltipShow(self)
 		end)
 		slot:HookScript("OnClick", function(self,button)
+			--self:GetParent():GetParent():GetParent():SlotClick(self,button)
 			MB:SlotClick(self,button)
 		end)
 		slot:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
 		
-		f.Container[containerID][i] = slot
+		f.Container[i] = slot
 		
 		if lastButton then
 			if (i - 1) % MB_config.numItemsPerRow == 0 then
 				slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
-				lastRowButton = f.Container[containerID][i];
+				lastRowButton = f.Container[i];
 				numContainerRows = numContainerRows + 1;
 			else
 				slot:Point('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:Point('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
+			slot:Point('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
 			--slot:Point('TOPLEFT', f, 'TOPLEFT', 8, -60);
-			lastRowButton = f.Container[containerID][i];
+			lastRowButton = f.Container[i];
 			numContainerRows = numContainerRows + 1;
 		end
-		lastButton = f.Container[containerID][i];
+		lastButton = f.Container[i];
 	end
 	
 	-- return f
 end
 
-function MB:TooltipShow(self)
+local function MB:TooltipShow(self)
 	if self and self.link then
 		local x = self:GetRight();
 		if ( x >= ( GetScreenWidth() / 2 ) ) then
@@ -581,7 +583,7 @@ function MB:TooltipShow(self)
 	end
 end
 
-function MB:SlotClick(self,button)
+local function MB:SlotClick(self,button)
 	local msg = self.link
 	if not msg then return; end
 	if IsShiftKeyDown() and button == 'LeftButton' then
@@ -600,7 +602,7 @@ function MB:SlotClick(self,button)
 		end
 	elseif button == 'LeftButton' then
 		if self.mailIndex and self.attachIndex then
-			for i = 1 , getn(self[mailIndex]) do
+			for i = getn(self[mailIndex]), 1, -1 do
 				TakeInboxItem(self[mailIndex][i], self[attachIndex][i])
 			end
 			MB:Update(true)
@@ -609,12 +611,12 @@ function MB:SlotClick(self,button)
 
 end
 
-function MB:UpdateContainer()
-	local f = MailboxBankFrame
-	local containerID = 1
+local function MB:UpdateContainer()
+	local f = self.MB_Frame
+	if not f then return end
 	for i = 1, MB_config.itemsSlotDisplay do
-		if f.Container[containerID][i] then
-			f.Container[containerID][i]:Hide()
+		if f.Container[i] then
+			f.Container[i]:Hide()
 		end
 	end
 	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
@@ -635,7 +637,7 @@ function MB:UpdateContainer()
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
 		
-		local slot = f.Container[containerID][i]
+		local slot = f.Container[i]
 		slot.link = slotDB[itemIndex].link
 		slot.checkMailTick = slotDB[itemIndex].checkMailTick
 		slot.sender = slotDB[itemIndex].sender
@@ -687,12 +689,12 @@ function MB:UpdateContainer()
 	FauxScrollFrame_Update(f.scrollBar, ceil(slotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
 end
 
-function MB:Update(isSortDB)
-	if isSortDB then MB:SortDB() end
-	MB:UpdateContainer()
+local function MB.Update(isSortDB)
+	if isSortDB then self:SortDB() end
+	self.UpdateContainer()
 end
 
-function MB:AlertDeadlineMails()
+local function MB.AlertDeadlineMails()
 	if not MB_DB[playername] then return end
 	local DeadlineList = {}
 	for i = MB_DB[playername].itemCount , 1, -1 do
@@ -721,11 +723,11 @@ local function MB:HookSendMail(recipient, subject, body)
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
 						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						MB:AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, 0, nil, k)
+						self.AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, 0, nil, k)
 					end
 				end
-				if MailboxBankFrame:IsVisible() and selectValue == k then
-					MB:Update(true)
+				if self.MB_Frame:IsVisible() and selectValue == k then
+					self.Update(true)
 				end
 				break
 			end
@@ -734,33 +736,33 @@ local function MB:HookSendMail(recipient, subject, body)
 end
 
 local function MB:FrameShow()
-	MailboxBankFrame:Show()
+	self.MB_Frame:Show()
 end
 
 local function MB:FrameHide()
-	MailboxBankFrame:Hide()
-	MB:SearchBarResetAndClear()
+	self.MB_Frame:Hide()
+	self.SearchBarResetAndClear
 	collectgarbage("collect")
 end
 
 local function MB:MAIL_INBOX_UPDATE()
-	MB:CheckMail()
+	self.CheckMail()
 	if selectValue == playername then
-		MB:Update(true)
+		self.Update(true)
 	end
 end
 
 local function MB:MAIL_SHOW()
-	if not MailboxBankFrame:IsVisible() then self:FrameShow(); end
+	if not self.MB_Frame:IsVisible() then MB:FrameShow(); end
 end
 
 local function MB:MAIL_CLOSED()
-	self:FrameHide()
+	MB:FrameHide()
 end
 
 ---- Event ----
 
-function MB:OnInitialize()
+local function MB:PLAYER_ENTERING_WORLD()
 	-- Register events
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:RegisterEvent("MAIL_SHOW")
@@ -768,24 +770,25 @@ function MB:OnInitialize()
 
 	if MB_config == nil then
 		MB_config = {}
-		for k ,v in pairs(MailboxBank_Config_INIT) do
+		for k ,v in pairs(self.Config_INIT) do
 			MB_config[k] = v;
 		end
 	end
 	if not MB_DB then MB_DB = {} end
-	self.CreatMailboxBankFrame("MailboxBankFrame")
-	MB:AlertDeadlineMails()
-		
-	self.OnInitialize = nil
+	self:CreatMailboxBankFrame("MailboxBankFrame")
+	self:AlertDeadlineMails()
+	
+	hooksecurefunc("SendMail", self:HookSendMail)
+	self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 end
 
-hooksecurefunc("SendMail", MB:HookSendMail)
+---- Slash command ----
 
 SLASH_MAILBOXBANK1 = "/mb";
 SLASH_MAILBOXBANK2 = "/mailbox";
 SlashCmdList["MAILBOXBANK"] = function()
-	if not MailboxBankFrame then return end
-	if MailboxBankFrame:IsVisible() then
+	if not MB.MB_Frame then return end
+	if MB.MB_Frame:IsVisible() then
 		MB:FrameHide()
 	else
 		MB:Update(true)
