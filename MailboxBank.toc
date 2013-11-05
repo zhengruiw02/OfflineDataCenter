@@ -3,8 +3,7 @@
 ## Title: Mailbox Bank
 ## Title-zhCN: 邮箱银行
 ## Title-zhTW: 郵箱銀行
-## Version: beta 2
-## RequiredDeps: ElvUI
+## Version: alpha 16
 ## SavedVariables: MB_DB, MB_config
 
 MailboxBank.lua
