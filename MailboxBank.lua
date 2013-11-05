@@ -11,12 +11,10 @@
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. should make new function to calculate deadline time?
 --@@ TODO: localization!
-	--UC..not today..
---@@ TODO: clear searching bar when changing character 
-	--UC.. may finished
+	--UC.. done?
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
-local E = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
---local MB = E:NewModule("MailboxBank")
+--local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank")
+local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local len, sub, find, format, join, match = string.len, string.sub, string.find, string.format, string.join, string.match
@@ -24,7 +22,7 @@ local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
 local slotDB
 
-local MailboxBank_config_init = {
+local MailboxBank_Config_INIT = {
 	daysLeftYellow = 5,
 	daysLeftRed = 3,
 	buttonSize = 36,
@@ -94,7 +92,7 @@ local function MailboxBank_CheckMail(isCollectMoney)
 			--@@ TODO: solve COD item, maybe can display COD amount in the slot icon or tooltip
 				if sender == nil then
 					--sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
-					sender = "----" 
+					sender = L["UNKNOWN SENDER"]
 					--return false
 				end
 				for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
@@ -263,11 +261,6 @@ function MailboxBank_SortDB(method, args)
 			usedSlot = usedSlot + 1
 			
 			slot = SelectSortMethod[method](usedSlot, args)
-			---
-			--slotDB[usedSlot] = {} --!!
-			--slot = slotDB[usedSlot] --!! must to calc to correct slot
-			
-			
 			
 			slot = MailboxBank_InsertToSortDB(slot, itemIndexCount, true)
 		end
@@ -309,8 +302,20 @@ end
 
 local function MailboxBank_CreatFrame(name)
 	----Create mailbox bank frame
-	local f = CreateFrame("Button", name, UIParent)
-	f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
+	local E
+	if ElvUI then E = unpack(ElvUI) end
+	local f = CreateFrame("Frame", name, UIParent)
+	if E then
+		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
+	else
+		f:SetBackdrop({
+			bgFile = [[Interface\DialogFrame\UI-DialogBox-Background]],
+			edgeFile = [[Interface\DialogFrame\UI-DialogBox-Border]],
+			tile = true, tileSize = 16, edgeSize = 16,
+			insets = { left = 1, right = 1, top = 1, bottom = 1 }
+		})
+	end
+	f:EnableMouse(true)
 	f:SetFrameStrata("DIALOG");
 	f:SetWidth(MB_config.frameWidth)
 	f:SetHeight(MB_config.frameHeight)
@@ -338,7 +343,7 @@ local function MailboxBank_CreatFrame(name)
 	----Create stack up button
 	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
 	f.stackUpCheckButton:Point("TOPLEFT", 2, -2)
-	f.stackUpCheckButton.text:SetText("堆疊物品")
+	f.stackUpCheckButton.text:SetText(L["Stack items"])
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
 		MailboxBank_Update(true)
@@ -346,9 +351,8 @@ local function MailboxBank_CreatFrame(name)
 
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, name)
-	local chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
-	chooseChar:Point("TOPLEFT", f, 80, -6)
-	f.chooseChar = chooseChar
+	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
+	f.chooseChar:Point("TOPLEFT", f, 80, -6)
 	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
 	
 	----Search
@@ -402,7 +406,7 @@ local function MailboxBank_CreatFrame(name)
 	f.CollectGoldButton:SetWidth(100)
 	f.CollectGoldButton:SetHeight(30)
 	f.CollectGoldButton:Point("BOTTOMLEFT", 10, 5);
-	f.CollectGoldButton:SetText("收取金幣")
+	f.CollectGoldButton:SetText(L["Collect gold"])
 	f.CollectGoldButton:SetScript("OnClick", MailboxBank_CollectMoney)
 	
 	----Create mailbox gold text
@@ -431,11 +435,14 @@ local function MailboxBank_CreatFrame(name)
 	end)
 	
 	if E then
-		E:GetModule("Skins"):HandleCloseButton(f.closeButton);
-		E:GetModule("Skins"):HandleCheckBox(f.stackUpCheckButton);
-		E.Skins:HandleDropDownBox(chooseChar, 180)
-		E:GetModule("Skins"):HandleButton(f.CollectGoldButton)
-		E:GetModule("Skins"):HandleScrollBar(f.scrollBar);
+		local S = E:GetModule("Skins")
+		if S then
+			S:HandleCloseButton(f.closeButton);
+			S:HandleCheckBox(f.stackUpCheckButton);
+			S:HandleDropDownBox(f.chooseChar, 180)
+			S:HandleButton(f.CollectGoldButton)
+			S:HandleScrollBar(f.scrollBar);
+		end
 	end
 	
 	----Create Container
@@ -514,20 +521,20 @@ function MailboxBank_TooltipShow(self)
 			if formatList[self.sender[i]] == nil then
 				formatList[self.sender[i]] = {}
 				local row = {}
-				row.lefttext = "發件人: "..self.sender[i]
+				row.lefttext = L["Sender: "] ..self.sender[i]
 				row.righttext = 0
 				tinsert(formatList[self.sender[i]], row)
 			end
 			
-			local lefttext = "+ 剩餘 "
+			local lefttext = L["+ Left time"]
 			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
 			local leftday = floor(dayLeftTick / 86400)
 			if leftday > 0 then
-				lefttext = lefttext.."大於"..tostring(leftday).."天"
+				lefttext = lefttext..L["greater than"]..tostring(leftday)..L["days"]
 			else
 				local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
 				local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-				lefttext = lefttext..tostring(lefthour).."小時"..tostring(leftminute).."分鐘"
+				lefttext = lefttext..tostring(lefthour)..L["hours"]..tostring(leftminute)..L["minutes"]
 			end
 			
 			local foundSameLefttime = false
@@ -567,7 +574,7 @@ function MailboxBank_TooltipShow(self)
 		end
 		
 		if self.wasReturned == 1 then
-			GameTooltip:AddLine("已被退回")
+			GameTooltip:AddLine(L["was returned"])
 		end
 
 		GameTooltip:Show()
@@ -613,7 +620,7 @@ function MailboxBank_UpdateContainer()
 	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
 	if not slotDB then return end
 	
-	f.mailboxGoldText:SetText("郵箱金幣: "..GetCoinTextureString(MB_DB[selectValue].money))
+	f.mailboxGoldText:SetText(L["Mailbox gold: "]..GetCoinTextureString(MB_DB[selectValue].money))
 	--f.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectValue].checkMailTick)/60).." 分鐘前掃描" or "");
 
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
@@ -687,15 +694,22 @@ end
 
 function MailboxBank_AlertDeadlineMails()
 	if not MB_DB[playername] then return end
-	--local DeadlineList = {}
+	local DeadlineList = {}
 	for i = MB_DB[playername].itemCount , 1, -1 do
 		local dayLeft = floor(difftime(floor(MB_DB[playername][i].daysLeft * 86400) + MB_DB[playername].checkMailTick,time()) / 86400)
 		if dayLeft < 3 then
-			print("|cffff0000您的邮箱有快到期的附件|r"..MB_DB[playername][i].itemLink.."|cffff0000（还剩不足|r"..(dayLeft+1).."|cffff0000天），请注意查收|r")
-			return
+			tinsert(DeadlineList, MB_DB[playername][i].itemLink)
 		else
-			return
+			break
 		end
+	end
+	if DeadlineList ~= {} then
+		local alertText = L["MailboxBank: |cffaa0000: |r"]
+		for i, v in pairs(DeadlineList) do
+			alertText = alertText .. v
+		end
+		alertText = alertText .. L["|cffaa0000Please remember to check it!|r"]
+		print(alertText)
 	end
 end
 
@@ -749,10 +763,9 @@ local function MailboxBank_OnEvent(self, event, args)
 	if event == "PLAYER_ENTERING_WORLD" then
 		if MB_config == nil then
 			MB_config = {}
-			for k ,v in pairs(MailboxBank_config_init) do
+			for k ,v in pairs(MailboxBank_Config_INIT) do
 				MB_config[k] = v;
 			end
-			--E:CopyTable(MB_config, MailboxBank_config_init)
 		end
 		if not MB_DB then MB_DB = {} end
 		MailboxBank_CreatFrame("MailboxBankFrame")
