@@ -241,7 +241,7 @@ function MB:InsertToSortDB(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MBLSortDB(method, args)
+function MB:SortDB(method, args)
 --@@  TODO: clear up! collect garbage
 	if not method then method = "normal" end
 	local usedSlot = 0
@@ -304,10 +304,10 @@ function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
+	local FontTemplate = FontTemplate
 	if not FontTemplate then
-		local FontTemplate = function()
-		
-		
+		FontTemplate = function()
+			SetFont(STANDARD_TEXT_FONT, 12)
 		end
 	end
 	self.MB_Frame = CreateFrame("Frame", nil , UIParent)
@@ -330,7 +330,6 @@ function MB:CreatMailboxBankFrame()
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
-	--f:RegisterForClicks("AnyUp");
 	f:SetScript("OnDragStart", function(self)
 		self:StartMoving()
 	end)
@@ -399,8 +398,7 @@ function MB:CreatMailboxBankFrame()
 	f.chooseChar = CreateFrame('Frame', "MailboxBankFrameDropDown", f, 'UIDropDownMenuTemplate')
 	print(f.chooseChar)
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
-	--print(self:DropDownMenuInitialize())
-	UIDropDownMenu_Initialize(f.chooseChar, f:GetParent():DropDownMenuInitialize());
+	
 	
 	----Create collect mailbox gold button
 	f.CollectGoldButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate");
@@ -519,6 +517,7 @@ function MB:CreatMailboxBankFrame()
 	end)
 	
 	f.CollectGoldButton:SetScript("OnClick", f:GetParent():CollectMoney())
+	UIDropDownMenu_Initialize(f.chooseChar, self:DropDownMenuInitialize());
 	-- return f
 end
 
@@ -820,13 +819,12 @@ local function MailboxBank_OnEvent(self, event)
 		self:RegisterEvent("MAIL_INBOX_UPDATE")
 		self:RegisterEvent("MAIL_SHOW")
 		self:RegisterEvent("MAIL_CLOSED")
-		--if MB_config == nil then
+		if MB_config == nil then
 			MB_config = {}
 			for k ,v in pairs(self.config_init) do
 				MB_config[k] = v;
 			end
-			--E:CopyTable(MB_config, MailboxBank_config_init)
-		--end
+		end
 		if not MB_DB then MB_DB = {} end
 		self:CreatMailboxBankFrame()
 		self:AlertDeadlineMails()
