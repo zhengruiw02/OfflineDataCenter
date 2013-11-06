@@ -364,7 +364,7 @@ local function MailboxBank_CreatFrame(name)
 	----Search
 	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
-	f.searchingBar:CreateBackdrop('Default', true);
+	--f.searchingBar:CreateBackdrop('Default', true);
 	f.searchingBar:SetHeight(15);
 	f.searchingBar:SetWidth(200);
 	f.searchingBar:Hide();
@@ -452,19 +452,16 @@ local function MailboxBank_CreatFrame(name)
 	end
 	
 	----Create Container
-	local containerID = 1
-	f.Container = {}
-	f.Container[containerID] = CreateFrame('Frame', name..'Container'..containerID, f);
-	--f.Container[containerID]:SetID(containerID);
-	f.Container[containerID]:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -64);
-	f.Container[containerID]:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
-	f.Container[containerID]:Show()
+	f.Container = CreateFrame('Frame', name..'Container', f);
+	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -64);
+	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
+	f.Container:Show()
 	
 	local numContainerRows = 0;
 	local lastButton;
 	local lastRowButton;
 	for i = 1, MB_config.itemsSlotDisplay do
-		local slot = CreateFrame('Button', name..'Container'..containerID..'Slot'..i, f.Container[containerID]);
+		local slot = CreateFrame('Button', name..'Container'..'Slot'..i, f.Container);
 		slot:Hide()
 		slot:SetTemplate('Default');
 		slot:StyleButton();
@@ -490,23 +487,23 @@ local function MailboxBank_CreatFrame(name)
 			GameTooltip:Hide()
 		end)
 		
-		f.Container[containerID][i] = slot
+		f.Container[i] = slot
 		
 		if lastButton then
 			if (i - 1) % MB_config.numItemsPerRow == 0 then
 				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
-				lastRowButton = f.Container[containerID][i];
+				lastRowButton = f.Container[i];
 				numContainerRows = numContainerRows + 1;
 			else
 				slot:SetPoint('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:SetPoint('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
+			slot:SetPoint('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
 			--slot:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -60);
-			lastRowButton = f.Container[containerID][i];
+			lastRowButton = f.Container[i];
 			numContainerRows = numContainerRows + 1;
 		end
-		lastButton = f.Container[containerID][i];
+		lastButton = f.Container[i];
 	end
 	
 	-- return f
@@ -617,10 +614,9 @@ end
 
 function MailboxBank_UpdateContainer()
 	local f = MailboxBankFrame
-	local containerID = 1
 	for i = 1, MB_config.itemsSlotDisplay do
-		if f.Container[containerID][i] then
-			f.Container[containerID][i]:Hide()
+		if f.Container[i] then
+			f.Container[i]:Hide()
 		end
 	end
 	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
@@ -641,7 +637,7 @@ function MailboxBank_UpdateContainer()
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
 		
-		local slot = f.Container[containerID][i]
+		local slot = f.Container[i]
 		slot.link = slotDB[itemIndex].link
 		slot.checkMailTick = slotDB[itemIndex].checkMailTick
 		slot.sender = slotDB[itemIndex].sender
