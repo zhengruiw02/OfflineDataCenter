@@ -22,7 +22,7 @@ local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
 local slotDB
 
-local MailboxBank_Config_INIT = {
+local MailboxBank_Config_init = {
 	daysLeftYellow = 5,
 	daysLeftRed = 3,
 	buttonSize = 36,
@@ -304,6 +304,12 @@ local function MailboxBank_CreatFrame(name)
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
+	local FontTemplate = FontTemplate
+	if not FontTemplate then
+		FontTemplate = function()
+			SetFont(STANDARD_TEXT_FONT, 12)
+		end
+	end
 	local f = CreateFrame("Frame", name, UIParent)
 	if E then
 		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
@@ -334,7 +340,7 @@ local function MailboxBank_CreatFrame(name)
 	
 	----Create close button
 	f.closeButton = CreateFrame("Button", name.."CloseButton", f, "UIPanelCloseButton");
-	f.closeButton:Point("TOPRIGHT", -2, -2);
+	f.closeButton:SetPoint("TOPRIGHT", -2, -2);
 	f.closeButton:HookScript("OnClick", function()
 		MailboxBank_SearchBarResetAndClear()
 		collectgarbage("collect")
@@ -342,7 +348,7 @@ local function MailboxBank_CreatFrame(name)
 	
 	----Create stack up button
 	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
-	f.stackUpCheckButton:Point("TOPLEFT", 2, -2)
+	f.stackUpCheckButton:SetPoint("TOPLEFT", 2, -2)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
@@ -352,18 +358,18 @@ local function MailboxBank_CreatFrame(name)
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, name)
 	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
-	f.chooseChar:Point("TOPLEFT", f, 80, -6)
+	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
 	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
 	
 	----Search
 	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	f.searchingBar:CreateBackdrop('Default', true);
-	f.searchingBar:Height(15);
-	f.searchingBar:Width(200);
+	f.searchingBar:SetHeight(15);
+	f.searchingBar:SetWidth(200);
 	f.searchingBar:Hide();
-	f.searchingBar:Point('TOPLEFT', f, 'TOPLEFT', 8, -40);
-	--f.searchingBar:Point('TOPLEFT', f, 'TOPLEFT', 120, 60);
+	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -40);
+	--f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 120, 60);
 	f.searchingBar:SetAutoFocus(true);
 	f.searchingBar:SetScript("OnEscapePressed", MailboxBank_SearchBarResetAndClear);
 	f.searchingBar:SetScript("OnEnterPressed", MailboxBank_SearchBarResetAndClear);
@@ -405,19 +411,19 @@ local function MailboxBank_CreatFrame(name)
 	f.CollectGoldButton = CreateFrame("Button", name.."CollectGoldButton", f, "UIPanelButtonTemplate");
 	f.CollectGoldButton:SetWidth(100)
 	f.CollectGoldButton:SetHeight(30)
-	f.CollectGoldButton:Point("BOTTOMLEFT", 10, 5);
+	f.CollectGoldButton:SetPoint("BOTTOMLEFT", 10, 5);
 	f.CollectGoldButton:SetText(L["Collect gold"])
 	f.CollectGoldButton:SetScript("OnClick", MailboxBank_CollectMoney)
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
 	f.mailboxGoldText:FontTemplate()
-	f.mailboxGoldText:Point("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
+	f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	
 	----Create check time text
 	-- f.checktime = f:CreateFontString(nil, 'OVERLAY');
 	-- f.checktime:FontTemplate()
-	-- f.checktime:Point("BOTTOMLEFT", 20, 5);
+	-- f.checktime:SetPoint("BOTTOMLEFT", 20, 5);
 	
 	----Create scroll frame
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBarFrame", f, "FauxScrollFrameTemplate")
@@ -450,8 +456,8 @@ local function MailboxBank_CreatFrame(name)
 	f.Container = {}
 	f.Container[containerID] = CreateFrame('Frame', name..'Container'..containerID, f);
 	--f.Container[containerID]:SetID(containerID);
-	f.Container[containerID]:Point('TOPLEFT', f, 'TOPLEFT', 8, -64);
-	f.Container[containerID]:Point('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
+	f.Container[containerID]:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -64);
+	f.Container[containerID]:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container[containerID]:Show()
 	
 	local numContainerRows = 0;
@@ -467,11 +473,11 @@ local function MailboxBank_CreatFrame(name)
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
 		slot.count:FontTemplate()
-		slot.count:Point('BOTTOMRIGHT', 0, 2);
+		slot.count:SetPoint('BOTTOMRIGHT', 0, 2);
 		
 		slot.tex = slot:CreateTexture(nil, "OVERLAY", nil)
-		slot.tex:Point("TOPLEFT", slot, "TOPLEFT", 2, -2)
-		slot.tex:Point("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
+		slot.tex:SetPoint("TOPLEFT", slot, "TOPLEFT", 2, -2)
+		slot.tex:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
 		slot.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
 		
 		slot:SetScript("OnEnter", function(self)
@@ -488,15 +494,15 @@ local function MailboxBank_CreatFrame(name)
 		
 		if lastButton then
 			if (i - 1) % MB_config.numItemsPerRow == 0 then
-				slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
+				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
 				lastRowButton = f.Container[containerID][i];
 				numContainerRows = numContainerRows + 1;
 			else
-				slot:Point('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
+				slot:SetPoint('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:Point('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
-			--slot:Point('TOPLEFT', f, 'TOPLEFT', 8, -60);
+			slot:SetPoint('TOPLEFT', f.Container[containerID], 'TOPLEFT',0, 0)
+			--slot:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -60);
 			lastRowButton = f.Container[containerID][i];
 			numContainerRows = numContainerRows + 1;
 		end
@@ -763,7 +769,7 @@ local function MailboxBank_OnEvent(self, event, args)
 	if event == "PLAYER_ENTERING_WORLD" then
 		if MB_config == nil then
 			MB_config = {}
-			for k ,v in pairs(MailboxBank_Config_INIT) do
+			for k ,v in pairs(MailboxBank_Config_init) do
 				MB_config[k] = v;
 			end
 		end
