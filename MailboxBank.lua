@@ -161,14 +161,19 @@ local function MailboxBank_InsertToRevIndexTable(RevsubDB, keyword)
 
 end
 
-local function MailboxBank_InsertToIndexTable(subDB, Type, subType, keyword)
+local function MailboxBank_InsertToIndexTable(subDB, RevsubDB, Type, subType, keyword)
 	if not subDB or not Type then return false end
 	----one-level and two-level are difference!!
 	if not subDB[RevsubDB[Type]] then
-	
+		local sub = { name = Type, count = 0}
+		tinsert(subDB, sub)
+		RevsubDB[Type] = getn(subDB)
 	elseif subType then
 		if not subDB[RevsubDB[Type]][RevsubsubDB[subType]] then
-		
+			local sub = { name = Type, count = 0}
+			tinsert(subDB[RevsubDB[Type]], sub)
+			subDB[RevsubDB[Type]].count = subDB[RevsubDB[Type]].count + 1
+			RevsubsubDB[subType] = subDB[RevsubDB[Type]].count
 		else
 		
 		end
@@ -304,12 +309,6 @@ local function MailboxBank_CreatFrame(name)
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
-	local FontTemplate = FontTemplate
-	if not FontTemplate then
-		FontTemplate = function()
-			SetFont(STANDARD_TEXT_FONT, 12)
-		end
-	end
 	local f = CreateFrame("Frame", name, UIParent)
 	if E then
 		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
@@ -328,7 +327,7 @@ local function MailboxBank_CreatFrame(name)
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
-	f:RegisterForClicks("AnyUp");
+	--f:RegisterForClicks("AnyUp");
 	f:SetScript("OnDragStart", function(self)
 		self:StartMoving()
 	end)
@@ -359,12 +358,16 @@ local function MailboxBank_CreatFrame(name)
 	tinsert(UISpecialFrames, name)
 	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
-	UIDropDownMenu_Initialize(chooseChar, MailboxBank_DropDownMenuInitialize);
+	UIDropDownMenu_Initialize(f.chooseChar, MailboxBank_DropDownMenuInitialize);
 	
 	----Search
 	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
-	--f.searchingBar:CreateBackdrop('Default', true);
+	if E then
+		f.searchingBar:CreateBackdrop('Default', true);
+	else
+	
+	end
 	f.searchingBar:SetHeight(15);
 	f.searchingBar:SetWidth(200);
 	f.searchingBar:Hide();
@@ -381,10 +384,18 @@ local function MailboxBank_CreatFrame(name)
 	f.searchingBar:SetScript("OnTextChanged", MailboxBank_UpdateSearch);
 	f.searchingBar:SetScript('OnChar', MailboxBank_UpdateSearch);
 	f.searchingBar:SetText(SEARCH);
-	f.searchingBar:FontTemplate();
+	if E then
+		f.searchingBar:FontTemplate()
+	else
+		f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 
 	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
-	f.searchingBarText:FontTemplate();
+	if E then
+		f.searchingBarText:FontTemplate()
+	else
+		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 	f.searchingBarText:SetAllPoints(f.searchingBar);
 	f.searchingBarText:SetJustifyH("LEFT");
 	f.searchingBarText:SetText("|cff9999ff" .. SEARCH);
@@ -417,7 +428,11 @@ local function MailboxBank_CreatFrame(name)
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
-	f.mailboxGoldText:FontTemplate()
+	if E then
+		f.mailboxGoldText:FontTemplate()
+	else
+		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 	f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	
 	----Create check time text
@@ -463,13 +478,17 @@ local function MailboxBank_CreatFrame(name)
 	for i = 1, MB_config.itemsSlotDisplay do
 		local slot = CreateFrame('Button', name..'Container'..'Slot'..i, f.Container);
 		slot:Hide()
-		slot:SetTemplate('Default');
-		slot:StyleButton();
-		slot:Size(MB_config.buttonSize);
+		--slot:SetTemplate('Default');
+		--slot:StyleButton();
+		slot:SetSize(MB_config.buttonSize, MB_config.buttonSize);
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
-		slot.count:FontTemplate()
+		if E then
+			slot.count:FontTemplate()
+		else
+			slot.count:SetFont(STANDARD_TEXT_FONT, 12);
+		end
 		slot.count:SetPoint('BOTTOMRIGHT', 0, 2);
 		
 		slot.tex = slot:CreateTexture(nil, "OVERLAY", nil)
@@ -603,8 +622,8 @@ function MailboxBank_SlotClick(self,button)
 		end
 	elseif button == 'LeftButton' then
 		if self.mailIndex and self.attachIndex then
-			for i = 1 , getn(self[mailIndex]) do
-				TakeInboxItem(self[mailIndex][i], self[attachIndex][i])
+			for i = 1 , getn(self.mailIndex) do
+				TakeInboxItem(self.mailIndex[i], self.attachIndex[i])
 			end
 			MailboxBank_Update(true)
 		end
@@ -644,6 +663,18 @@ function MailboxBank_UpdateContainer()
 		slot.dayleft = slotDB[itemIndex].dayLeft
 		slot.countnum = slotDB[itemIndex].countNum
 		
+		-- if slotDB[itemIndex].mailIndex then
+			-- slot.mailIndex = {}
+			-- for k, v in ipairs(slotDB[itemIndex].mailIndex) do
+				-- slot.mailIndex[k] = v
+			-- end
+		-- end
+		-- if slotDB[itemIndex].attachIndex then
+			-- slot.attachIndex = {}
+			-- for k, v in ipairs(slotDB[itemIndex].attachIndex) do
+				-- slot.attachIndex[k] = v
+			-- end
+		-- end
 		slot.mailIndex = slotDB[itemIndex].mailIndex
 		slot.attachIndex = slotDB[itemIndex].attachIndex
 		slot.wasReturned = slotDB[itemIndex].wasReturned
@@ -705,7 +736,7 @@ function MailboxBank_AlertDeadlineMails()
 			break
 		end
 	end
-	if DeadlineList ~= {} then
+	if getn(DeadlineList) > 0 then
 		local alertText = L["MailboxBank: |cffaa0000: |r"]
 		for i, v in pairs(DeadlineList) do
 			alertText = alertText .. v
@@ -719,6 +750,7 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			if recipient..'-'..GetRealmName() == k then
+				local Sendmoney = GetSendMailMoney()
 				for i = ATTACHMENTS_MAX_RECEIVE, 1, -1 do
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
@@ -726,10 +758,13 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 						MailboxBank_AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, 0, nil, k)
 					end
 				end
+				if Sendmoney then
+					MB_DB[recipient..'-'..GetRealmName()].money = MB_DB[recipient..'-'..GetRealmName()].money + Sendmoney
+				end
 				if MailboxBankFrame:IsVisible() and selectValue == k then
 					MailboxBank_Update(true)
 				end
-				break
+				return
 			end
 		end
 	end
