@@ -76,6 +76,7 @@ local function MailboxBank_CheckMail(isCollectMoney)
 	if isCollectMoney and MB_DB[playername].money == 0 then return end
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
+	print(numItems.."  "..totalItems)
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
 			--local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
@@ -157,13 +158,29 @@ local function MailboxBank_CollectMoney()
 	MailboxBank_CheckMail(true)
 end
 
+local GetKeyword = {
+	["itemID"] = function(item)
+		local itemID = tonumber(match(item.itemLink, "item:(%d+)"))
+		return itemID
+	end,
+	["sender"] = function(item)
+		local sender = item.sender
+		return sender
+	end,
+	["quality"] = function(item)
+		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(item.itemLink)
+		return quality
+	end,
+}
+
 local function MailboxBank_InsertToRevIndexTable(RevsubDB, keyword)
 
 end
 
-local function MailboxBank_InsertToIndexTable(subDB, RevsubDB, Type, subType, keyword)
+local function MailboxBank_InsertToIndexTable(subDB, RevsubDB, Type, subType, item, keyword)
 	if not subDB or not Type then return false end
 	----one-level and two-level are difference!!
+	----假如没有RevsubDB则随便插入，不排序，否则就是本来就排序的。
 	if not subDB[RevsubDB[Type]] then
 		local sub = { name = Type, count = 0}
 		tinsert(subDB, sub)
@@ -285,6 +302,7 @@ function MailboxBank_ChooseChar_OnClick(self)
 	
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
+	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
 	MailboxBankFrameDropDown:SetWidth(width+60)	
 end
 
@@ -302,6 +320,7 @@ local function MailboxBank_DropDownMenuInitialize()
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, selectValue);
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
+	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
 	MailboxBankFrameDropDown:SetWidth(width+60)
 end
 
@@ -361,17 +380,17 @@ local function MailboxBank_CreatFrame(name)
 	UIDropDownMenu_Initialize(f.chooseChar, MailboxBank_DropDownMenuInitialize);
 	
 	----Search
-	f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
-	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	if E then
+		f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f);
 		f.searchingBar:CreateBackdrop('Default', true);
 	else
-	
+		f.searchingBar = CreateFrame('EditBox', name..'searchingBar', f, "BagSearchBoxTemplate");
 	end
+	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	f.searchingBar:SetHeight(15);
 	f.searchingBar:SetWidth(200);
 	f.searchingBar:Hide();
-	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -40);
+	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -40);
 	--f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 120, 60);
 	f.searchingBar:SetAutoFocus(true);
 	f.searchingBar:SetScript("OnEscapePressed", MailboxBank_SearchBarResetAndClear);
@@ -394,6 +413,7 @@ local function MailboxBank_CreatFrame(name)
 	if E then
 		f.searchingBarText:FontTemplate()
 	else
+		
 		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
 	end
 	f.searchingBarText:SetAllPoints(f.searchingBar);
@@ -476,14 +496,22 @@ local function MailboxBank_CreatFrame(name)
 	local lastButton;
 	local lastRowButton;
 	for i = 1, MB_config.itemsSlotDisplay do
-		local slot = CreateFrame('Button', name..'Container'..'Slot'..i, f.Container);
+		local slot
+		if E then
+			slot = CreateFrame('Button', name..'Container'..'Slot'..i, f.Container);
+			slot:SetTemplate('Default');
+			slot:StyleButton();
+		else
+			slot = CreateFrame('Button', name..'Container'..'Slot'..i, f.Container, "ItemButtonTemplate");
+
+		end
 		slot:Hide()
 		--slot:SetTemplate('Default');
 		--slot:StyleButton();
 		slot:SetSize(MB_config.buttonSize, MB_config.buttonSize);
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
-		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
+		--slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
 		if E then
 			slot.count:FontTemplate()
 		else
