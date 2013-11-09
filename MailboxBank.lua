@@ -20,7 +20,7 @@ local floor = math.floor
 local len, sub, find, format, join, match = string.len, string.sub, string.find, string.format, string.join, string.match
 local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
-local slotDB
+local slotDB, subIdxTb, revSubIdxTb
 
 local MailboxBank_Config_init = {
 	daysLeftYellow = 5,
@@ -39,18 +39,20 @@ local MailboxBank_Config_init = {
 	isStacked = false,
 }	
 
-local itemTypes, itemSubTypes
+local AhSortIndex
 
 local function BuildSortOrder()
-	itemTypes = {}
-	itemSubTypes = {}
+	AhSortIndex = {};
+	local c = 0;
 	for i, iType in ipairs({GetAuctionItemClasses()}) do
-		itemTypes[iType] = i
-		itemSubTypes[iType] = {}
+		c = c + 1
+		AhSortIndex[iType] = c;
 		for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			itemSubTypes[iType][isType] = ii
-		end
-	end
+			c = c + 1;
+			AhSortIndex[isType] = c;
+		end;
+	end;
+	AhSortIndex.__count = c
 end
 
 local function MailboxBank_AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, CODAmount, wasReturned, recipient)
@@ -76,7 +78,7 @@ local function MailboxBank_CheckMail(isCollectMoney)
 	if isCollectMoney and MB_DB[playername].money == 0 then return end
 	MB_DB[playername] = {itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
-	print(numItems.."  "..totalItems)
+	--print(numItems.."  "..totalItems)
 	if numItems and numItems > 0 then
 		for mailIndex = 1, numItems do
 			--local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
@@ -92,9 +94,7 @@ local function MailboxBank_CheckMail(isCollectMoney)
 			if hasItem then
 			--@@ TODO: solve COD item, maybe can display COD amount in the slot icon or tooltip
 				if sender == nil then
-					--sender = "UNKNOWN SENDER CAUSE OF NETWORK" 
 					sender = L["UNKNOWN SENDER"]
-					--return false
 				end
 				for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
 					local itemLink = GetInboxItemLink(mailIndex, attachIndex)
@@ -149,84 +149,172 @@ end
 local function MailboxBank_SearchBarResetAndClear()
 	local f = MailboxBankFrame
 	f.searchingBarText:Show();
-	
 	f.searchingBar:ClearFocus();
 	MailboxBank_SearchReset();
 end
 
 local function MailboxBank_CollectMoney()
+	MailboxBank_Event:UnregisterEvent("MAIL_INBOX_UPDATE")
 	MailboxBank_CheckMail(true)
+	MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 end
 
-local GetKeyword = {
-	["itemID"] = function(item)
-		local itemID = tonumber(match(item.itemLink, "item:(%d+)"))
-		return itemID
-	end,
-	["sender"] = function(item)
-		local sender = item.sender
-		return sender
-	end,
-	["quality"] = function(item)
-		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(item.itemLink)
-		return quality
-	end,
-}
 
-local function MailboxBank_InsertToRevIndexTable(RevsubDB, keyword)
-
-end
-
-local function MailboxBank_InsertToIndexTable(subDB, RevsubDB, Type, subType, item, keyword)
-	if not subDB or not Type then return false end
-	----one-level and two-level are difference!!
-	----假如没有RevsubDB则随便插入，不排序，否则就是本来就排序的。
-	if not subDB[RevsubDB[Type]] then
-		local sub = { name = Type, count = 0}
-		tinsert(subDB, sub)
-		RevsubDB[Type] = getn(subDB)
-	elseif subType then
-		if not subDB[RevsubDB[Type]][RevsubsubDB[subType]] then
-			local sub = { name = Type, count = 0}
-			tinsert(subDB[RevsubDB[Type]], sub)
-			subDB[RevsubDB[Type]].count = subDB[RevsubDB[Type]].count + 1
-			RevsubsubDB[subType] = subDB[RevsubDB[Type]].count
-		else
-		
-		end
-	else
-	
+local function MailboxBank_UpdateRevIndexTable(keyword, isAH) --keyword as [sender], "uncommom"
+	local insertIndex
+	if revSubIdxTb["__count"] == 0 then --table is nil
+		revSubIdxTb.__count = revSubIdxTb.__count + 1
+		insertIndex = revSubIdxTb.__count
+	elseif not isAH then --add to last
+		revSubIdxTb.__count = revSubIdxTb.__count + 1
+		insertIndex = revSubIdxTb.__count
+	else --table is not empty
+		local AhIndex = AhSortIndex[keyword]
+		for i, v in ipairs(subIdxTb) do --table is not empty
+			if AhSortIndex[subIdxTb[i].keyword] > AhIndex then --can insert before end of table
+				for ii = i, revSubIdxTb.__count do --move items after current key
+					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
+				end
+				revSubIdxTb.__count = revSubIdxTb.__count + 1
+				insertIndex = i
+				break
+			elseif i == getn(subIdxTb) then --insert to end of table
+				revSubIdxTb.__count = revSubIdxTb.__count + 1
+				insertIndex = revSubIdxTb.__count
+				break
+			end
+		end	
 	end
-	
-	
-	----
-	for Index = 1, subDB.count do
-		if subDB[Index].value == Type then
-			for subIndex = 1, getn(subDB[subIndex]) - 1 do -- except value
-			
+	revSubIdxTb[keyword] = insertIndex
+	local t = {}
+	t.keyword = keyword
+	t.itemslotCount = 0
+	tinsert(subIdxTb, insertIndex, t)
+end
+
+local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, isAH)
+	if not keyword or not itemID or not itemCount then return end
+	if not revSubIdxTb[keyword] then
+		 MailboxBank_UpdateRevIndexTable(keyword, isAH)
+	end
+	local subIdx = revSubIdxTb[keyword]
+	local c = 0
+	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
+		subIdxTb[subIdx][1] = {["itemID"] = itemID,["count"] = 1}
+		subIdxTb[subIdx][1][1] = itemCount
+		subIdxTb[subIdx].itemslotCount = 1
+		for i = 1, subIdx do
+			c = c + subIdxTb[i].itemslotCount
+		end
+		return c
+	else
+		for i, v in ipairs(subIdxTb[subIdx]) do
+			if subIdxTb[subIdx][i].itemID > itemID then --can insert before end of table
+				local t = {[1] = itemCount, ["itemID"] = itemID}
+				tinsert(subIdxTb[subIdx], i, t)
+				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
+				for ii = 1, subIdx - 1 do
+					c = c + subIdxTb[ii].itemslotCount
+				end
+				for ii = 1, i do
+					c = c + getn(subIdxTb[subIdx][ii])
+				end
+				return c
+			elseif subIdxTb[subIdx][i].itemID == itemID then
+				for ii, v in ipairs(subIdxTb[subIdx][i]) do
+					if v > itemCount then
+						tinsert(subIdxTb[subIdx][i], ii, itemCount)
+						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
+						for iii = 1, subIdx - 1 do
+							c = c + subIdxTb[iii].itemslotCount
+						end
+						for iii = 1, i - 1 do
+							c = c + getn(subIdxTb[subIdx][iii])
+						end
+						c = c + ii
+						return c
+					elseif ii == getn(subIdxTb[subIdx][i]) then
+						tinsert(subIdxTb[subIdx][i], itemCount)
+						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
+						for iii = 1, subIdx - 1 do
+							c = c + subIdxTb[iii].itemslotCount
+						end
+						for iii = 1, i do
+							c = c + getn(subIdxTb[subIdx][iii])
+						end
+						return c
+					end
+				end
+			elseif i == getn(subIdxTb[subIdx]) then  --insert to end of table
+				local t = {[1] = itemCount, ["itemID"] = itemID}
+				tinsert(subIdxTb[subIdx], t)
+				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
+				for ii = 1, subIdx do
+					c = c + subIdxTb[ii].itemslotCount
+				end
+				return c
 			end
 		end
 	end
-	--
 end
 
+--revSubIdxTb, subIdxTb
+--[[ subIdxTb structure
+			subType		itemsID			sameID items	slot?
+subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemCount
+			[2]			[2]				[2]
+			...			...				...
+			[n]			[n]				[n]
+						.keyword		.itemID
+						.itemslotCount
+		//.count(拍卖行顺序中间有漏项，需要数清楚了。。)uppdate:AH也是用传统排序，不过插入的时候要看优先级？yes！
+]]
+--		getn(itemsID)	getn(sameID)
+--[[
+first get subTypeID and itemID. if got same itemID then find counts..
+oh its in the middle of some sameID? then insert in it.
+now we got subTypeID itemID. we can count out how many SubType and itemID before us.
+or, its hard to count??? shit
+for i = 1, subIdxTb.count do (ohShit!!!)
+]]
+--insert and return position!
+
+--[[ revSubIdxTb structure
+				subTypeName		subType
+revSubIdxTb{	["a"] 		=	1
+				["b"]		=	2
+				...			
+				["n"]		=	n
+				.__count = count
+]]
 local SelectSortMethod = {
 	["normal"] = function(usedSlot)
-		slotDB[usedSlot] = {}
-		return slotDB[usedSlot]
+		return usedSlot
 	end,
-	["AH"] = function()
-		local keyword = "itemID"
-	
+	["AH"] = function(usedSlot, itemIndexCount)
+	---pseudo code
+		BuildSortOrder()
+		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
+		local itemCount = MB_DB[selectValue][itemIndexCount].count
+		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
+		return MailboxBank_InsertToIndexTable(itemSubType, itemID, itemCount, true)	
 	end,
-	["sender"] = function()
-		local keyword = "sender"
+	["sender"] = function(usedSlot, itemIndexCount)
+		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
+		local itemCount = MB_DB[selectValue][itemIndexCount].count
+		local sender = MB_DB[selectValue][itemIndexCount].sender
+		return MailboxBank_InsertToIndexTable(sender, itemID, itemCount)	
 	end,
-	["quality"] = function()
-		local keyword = "quality"
+	["quality"] = function(usedSlot, itemIndexCount)
+		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
+		local itemCount = MB_DB[selectValue][itemIndexCount].count
+		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndexCount].itemLink)
+		return MailboxBank_InsertToIndexTable(quality, itemID, itemCount)
 	end,
-	["codOnly"] = function() 
-		local keyword = "sender"
+	["codOnly"] = function(usedSlot, itemIndexCount)
+		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
+		local itemCount = MB_DB[selectValue][itemIndexCount].count
+		local cod = "sender"
 	end,
 }
 
@@ -270,7 +358,10 @@ end
 
 function MailboxBank_SortDB(method, args)
 --@@  TODO: clear up! collect garbage
-	if not method then method = "normal" end
+	--if not method then method = "normal" end
+	if not method then method = "quality" end
+	subIdxTb = {}
+	revSubIdxTb = {["__count"] = 0}
 	local usedSlot = 0
 	slotDB = {}
 	for itemIndexCount = 1, MB_DB[selectValue].itemCount do
@@ -281,9 +372,11 @@ function MailboxBank_SortDB(method, args)
 		if not slot then
 			
 			usedSlot = usedSlot + 1
+
+			local c = SelectSortMethod[method](usedSlot, itemIndexCount)
 			
-			slot = SelectSortMethod[method](usedSlot, args)
-			
+			slot = {}
+			tinsert(slotDB, c, slot)
 			slot = MailboxBank_InsertToSortDB(slot, itemIndexCount, true)
 		end
 		
@@ -303,7 +396,7 @@ function MailboxBank_ChooseChar_OnClick(self)
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
-	MailboxBankFrameDropDown:SetWidth(width+60)	
+	MailboxBankFrameDropDown:SetWidth(width+80)	
 end
 
 local function MailboxBank_DropDownMenuInitialize()
@@ -321,7 +414,7 @@ local function MailboxBank_DropDownMenuInitialize()
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
-	MailboxBankFrameDropDown:SetWidth(width+60)
+	MailboxBankFrameDropDown:SetWidth(width+80)
 end
 
 local function MailboxBank_CreatFrame(name)
@@ -839,7 +932,7 @@ local function MailboxBank_OnEvent(self, event, args)
 	end
 end
 
-local MailboxBank_Event = CreateFrame("Frame")
+MailboxBank_Event = CreateFrame("Frame")
 --MailboxBank_Event:RegisterEvent("ADDON_LOADED")
 MailboxBank_Event:RegisterEvent("PLAYER_ENTERING_WORLD")
 MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
