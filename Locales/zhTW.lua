@@ -2,6 +2,11 @@ local L = LibStub("AceLocale-3.0"):NewLocale("MailboxBank", "zhTW")
 if L then
 	L["UNKNOWN SENDER"] = "\[未知發件人\]"
 	L["Stack items"] = "堆疊物品"
+	L["normal"] = "普通"
+	L["AH"] = "拍賣行"
+	L["sender"] = "發件人"
+	L["quality"] = "品質"
+	L["codOnly"] = "COD"
 	L["Collect gold"] = "收取金幣"
 	L["Sender: "]  = "發件人: "
 	L["+ Left time"] = "+ 剩餘 "

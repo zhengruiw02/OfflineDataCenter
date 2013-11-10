@@ -160,15 +160,15 @@ local function MailboxBank_CollectMoney()
 end
 
 
-local function MailboxBank_UpdateRevIndexTable(keyword, isAH) --keyword as [sender], "uncommom"
+local function MailboxBank_UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
 	local insertIndex
 	if revSubIdxTb["__count"] == 0 then --table is nil
 		revSubIdxTb.__count = revSubIdxTb.__count + 1
 		insertIndex = revSubIdxTb.__count
-	elseif not isAH then --add to last
+	elseif not method then --add to last
 		revSubIdxTb.__count = revSubIdxTb.__count + 1
 		insertIndex = revSubIdxTb.__count
-	else --table is not empty
+	elseif method == "AH" then--table is not empty
 		local AhIndex = AhSortIndex[keyword]
 		for i, v in ipairs(subIdxTb) do --table is not empty
 			if AhSortIndex[subIdxTb[i].keyword] > AhIndex then --can insert before end of table
@@ -183,7 +183,22 @@ local function MailboxBank_UpdateRevIndexTable(keyword, isAH) --keyword as [send
 				insertIndex = revSubIdxTb.__count
 				break
 			end
-		end	
+		end
+	elseif method == "quality" then
+		for i, v in ipairs(subIdxTb) do --table is not empty
+			if subIdxTb[i].keyword > keyword then --can insert before end of table
+				for ii = i, revSubIdxTb.__count do --move items after current key
+					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
+				end
+				revSubIdxTb.__count = revSubIdxTb.__count + 1
+				insertIndex = i
+				break
+			elseif i == getn(subIdxTb) then --insert to end of table
+				revSubIdxTb.__count = revSubIdxTb.__count + 1
+				insertIndex = revSubIdxTb.__count
+				break
+			end
+		end
 	end
 	revSubIdxTb[keyword] = insertIndex
 	local t = {}
@@ -192,10 +207,10 @@ local function MailboxBank_UpdateRevIndexTable(keyword, isAH) --keyword as [send
 	tinsert(subIdxTb, insertIndex, t)
 end
 
-local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, isAH)
+local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method)
 	if not keyword or not itemID or not itemCount then return end
 	if not revSubIdxTb[keyword] then
-		 MailboxBank_UpdateRevIndexTable(keyword, isAH)
+		 MailboxBank_UpdateRevIndexTable(keyword, method)
 	end
 	local subIdx = revSubIdxTb[keyword]
 	local c = 0
@@ -267,7 +282,6 @@ subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemCount
 			[n]			[n]				[n]
 						.keyword		.itemID
 						.itemslotCount
-		//.count(拍卖行顺序中间有漏项，需要数清楚了。。)uppdate:AH也是用传统排序，不过插入的时候要看优先级？yes！
 ]]
 --		getn(itemsID)	getn(sameID)
 --[[
@@ -292,12 +306,11 @@ local SelectSortMethod = {
 		return usedSlot
 	end,
 	["AH"] = function(usedSlot, itemIndexCount)
-	---pseudo code
-		BuildSortOrder()
+		if not AhSortIndex then BuildSortOrder() end
 		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
 		local itemCount = MB_DB[selectValue][itemIndexCount].count
 		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
-		return MailboxBank_InsertToIndexTable(itemSubType, itemID, itemCount, true)	
+		return MailboxBank_InsertToIndexTable(itemSubType, itemID, itemCount, "AH")	
 	end,
 	["sender"] = function(usedSlot, itemIndexCount)
 		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
@@ -309,7 +322,7 @@ local SelectSortMethod = {
 		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
 		local itemCount = MB_DB[selectValue][itemIndexCount].count
 		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndexCount].itemLink)
-		return MailboxBank_InsertToIndexTable(quality, itemID, itemCount)
+		return MailboxBank_InsertToIndexTable(quality, itemID, itemCount, "quality")
 	end,
 	["codOnly"] = function(usedSlot, itemIndexCount)
 		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
@@ -359,7 +372,7 @@ end
 function MailboxBank_SortDB(method, args)
 --@@  TODO: clear up! collect garbage
 	--if not method then method = "normal" end
-	if not method then method = "quality" end
+	if not method then method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) end
 	subIdxTb = {}
 	revSubIdxTb = {["__count"] = 0}
 	local usedSlot = 0
@@ -372,7 +385,7 @@ function MailboxBank_SortDB(method, args)
 		if not slot then
 			
 			usedSlot = usedSlot + 1
-
+			print(method)
 			local c = SelectSortMethod[method](usedSlot, itemIndexCount)
 			
 			slot = {}
@@ -387,6 +400,34 @@ function MailboxBank_SortDB(method, args)
 end
 
 ---- GUI ----
+function MailboxBank_SortMethod_OnClick(self)
+	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self:GetID())
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
+	MailboxBank_Update(true)
+	--local text = MailboxBankFrameSortDropDownText;
+	--local width = text:GetStringWidth();
+	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
+	--MailboxBankFrameSortDropDown:SetWidth(width+60)	
+end
+
+local function MailboxBank_SortMenuInitialize()
+	local info = UIDropDownMenu_CreateInfo();
+	for k, v in pairs(SelectSortMethod) do
+			info = UIDropDownMenu_CreateInfo()
+			info.text = L[k]
+			info.value = k
+			info.func = MailboxBank_SortMethod_OnClick;
+			UIDropDownMenu_AddButton(info, level)
+	end
+	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
+		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "normal");
+	end
+	--local text = MailboxBankFrameSortDropDownText;
+	--local width = text:GetStringWidth();
+	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
+	--MailboxBankFrameSortDropDown:SetWidth(width+60)
+end
+
 function MailboxBank_ChooseChar_OnClick(self)
 	selectValue = self.value
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
@@ -396,7 +437,7 @@ function MailboxBank_ChooseChar_OnClick(self)
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
-	MailboxBankFrameDropDown:SetWidth(width+80)	
+	MailboxBankFrameDropDown:SetWidth(width+60)	
 end
 
 local function MailboxBank_DropDownMenuInitialize()
@@ -414,7 +455,7 @@ local function MailboxBank_DropDownMenuInitialize()
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, width+40);
-	MailboxBankFrameDropDown:SetWidth(width+80)
+	MailboxBankFrameDropDown:SetWidth(width+60)
 end
 
 local function MailboxBank_CreatFrame(name)
@@ -438,8 +479,7 @@ local function MailboxBank_CreatFrame(name)
 	f:SetHeight(MB_config.frameHeight)
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
-	f:RegisterForDrag("LeftButton")
-	--f:RegisterForClicks("AnyUp");
+	f:RegisterForDrag("LeftButton");
 	f:SetScript("OnDragStart", function(self)
 		self:StartMoving()
 	end)
@@ -466,11 +506,19 @@ local function MailboxBank_CreatFrame(name)
 		MailboxBank_Update(true)
 	end)
 
-	----Create choose char dropdown menu
+	----Create sort dropdown menu
 	tinsert(UISpecialFrames, name)
+	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
+	f.sortmethod:SetPoint("TOPRIGHT", f, -10, -36)
+	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
+	
+	----Create choose char dropdown menu
+	--tinsert(UISpecialFrames, name)
 	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
+	
 	UIDropDownMenu_Initialize(f.chooseChar, MailboxBank_DropDownMenuInitialize);
+	--UIDropDownMenu_SetWidth(MailboxBankFrameDropDown, 200);
 	
 	----Search
 	if E then
@@ -573,7 +621,8 @@ local function MailboxBank_CreatFrame(name)
 		if S then
 			S:HandleCloseButton(f.closeButton);
 			S:HandleCheckBox(f.stackUpCheckButton);
-			S:HandleDropDownBox(f.chooseChar, 180)
+			S:HandleDropDownBox(f.sortmethod)
+			S:HandleDropDownBox(f.chooseChar)
 			S:HandleButton(f.CollectGoldButton)
 			S:HandleScrollBar(f.scrollBar);
 		end
@@ -784,18 +833,6 @@ function MailboxBank_UpdateContainer()
 		slot.dayleft = slotDB[itemIndex].dayLeft
 		slot.countnum = slotDB[itemIndex].countNum
 		
-		-- if slotDB[itemIndex].mailIndex then
-			-- slot.mailIndex = {}
-			-- for k, v in ipairs(slotDB[itemIndex].mailIndex) do
-				-- slot.mailIndex[k] = v
-			-- end
-		-- end
-		-- if slotDB[itemIndex].attachIndex then
-			-- slot.attachIndex = {}
-			-- for k, v in ipairs(slotDB[itemIndex].attachIndex) do
-				-- slot.attachIndex[k] = v
-			-- end
-		-- end
 		slot.mailIndex = slotDB[itemIndex].mailIndex
 		slot.attachIndex = slotDB[itemIndex].attachIndex
 		slot.wasReturned = slotDB[itemIndex].wasReturned
