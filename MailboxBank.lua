@@ -324,11 +324,11 @@ local SelectSortMethod = {
 		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndexCount].itemLink)
 		return MailboxBank_InsertToIndexTable(quality, itemID, itemCount, "quality")
 	end,
-	["codOnly"] = function(usedSlot, itemIndexCount)
+	--[[["codOnly"] = function(usedSlot, itemIndexCount)
 		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
 		local itemCount = MB_DB[selectValue][itemIndexCount].count
 		local cod = "sender"
-	end,
+	end,]]
 }
 
 local function MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
@@ -369,10 +369,10 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MailboxBank_SortDB(method, args)
+function MailboxBank_SortDB()
 --@@  TODO: clear up! collect garbage
 	--if not method then method = "normal" end
-	if not method then method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) end
+	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	subIdxTb = {}
 	revSubIdxTb = {["__count"] = 0}
 	local usedSlot = 0
@@ -385,9 +385,11 @@ function MailboxBank_SortDB(method, args)
 		if not slot then
 			
 			usedSlot = usedSlot + 1
-			print(method)
-			local c = SelectSortMethod[method](usedSlot, itemIndexCount)
-			
+			--print(method)
+			local c
+			while c == nil do
+				c = SelectSortMethod[method](usedSlot, itemIndexCount)
+			end
 			slot = {}
 			tinsert(slotDB, c, slot)
 			slot = MailboxBank_InsertToSortDB(slot, itemIndexCount, true)
@@ -401,7 +403,6 @@ end
 
 ---- GUI ----
 function MailboxBank_SortMethod_OnClick(self)
-	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self:GetID())
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
 	MailboxBank_Update(true)
 	--local text = MailboxBankFrameSortDropDownText;
@@ -430,6 +431,7 @@ end
 
 function MailboxBank_ChooseChar_OnClick(self)
 	selectValue = self.value
+	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "normal");
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
 	MailboxBank_SearchBarResetAndClear()
 	MailboxBank_Update(true)
