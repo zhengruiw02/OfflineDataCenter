@@ -511,7 +511,7 @@ local function MailboxBank_CreatFrame(name)
 	----Create sort dropdown menu
 	tinsert(UISpecialFrames, name)
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
-	f.sortmethod:SetPoint("TOPRIGHT", f, -10, -36)
+	f.sortmethod:SetPoint("TOPLEFT", f, 190, -36)
 	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
 	
 	----Create choose char dropdown menu
@@ -531,7 +531,7 @@ local function MailboxBank_CreatFrame(name)
 	end
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	f.searchingBar:SetHeight(15);
-	f.searchingBar:SetWidth(200);
+	f.searchingBar:SetWidth(180);
 	f.searchingBar:Hide();
 	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -40);
 	--f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 120, 60);
