@@ -269,11 +269,8 @@ end
 ---- GUI ----
 function MB:ChooseChar_OnClick(value) ---!!!
 	local f = self.MB_Frame
-	print(selectValue)
-	print(value)
 	selectValue = value
-	print(f.chooseChar:GetName())
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, value);
+	UIDropDownMenu_SetSelectedValue(f.chooseChar, value);
 	self:SearchBarResetAndClear()
 	self:Update(true)
 	
@@ -304,15 +301,12 @@ function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
-	local FontTemplate = FontTemplate
-	if not FontTemplate then
-		FontTemplate = function()
-			SetFont(STANDARD_TEXT_FONT, 12)
-		end
-	end
+	self.MB_Frame = {}
 	self.MB_Frame = CreateFrame("Frame", nil , UIParent)
+	print(self.MB_Frame)
 	local f = self.MB_Frame
 	f:SetParent(self)
+	print(f)
 	if E then
 		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
 	else
@@ -327,7 +321,8 @@ function MB:CreatMailboxBankFrame()
 	f:SetFrameStrata("DIALOG");
 	f:SetWidth(MB_config.frameWidth)
 	f:SetHeight(MB_config.frameHeight)
-	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
+	f:SetPoint("CENTER", 0, 0)
+	--f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", function(self)
@@ -337,7 +332,7 @@ function MB:CreatMailboxBankFrame()
 		self:StopMovingOrSizing()
 		MB_config.p, MB_config.pf, MB_config.pa, MB_config.px, MB_config.py = self:GetPoint()
 	end)
-	--f:Hide()
+	f:Hide()
 	
 	----Create close button
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
@@ -357,18 +352,30 @@ function MB:CreatMailboxBankFrame()
 	end)
 
 	----Search
-	f.searchingBar = CreateFrame('EditBox', nil, f);
+	if E then
+		f.searchingBar = CreateFrame('EditBox', nil, f);
+		f.searchingBar:CreateBackdrop('Default', true);
+	else
+		f.searchingBar = CreateFrame('EditBox', nil, f, "BagSearchBoxTemplate");
+	end
 	f.searchingBar:SetFrameLevel(self:GetFrameLevel() + 2);
 	--f.searchingBar:CreateBackdrop('Default', true);
 	f.searchingBar:SetHeight(15);
 	f.searchingBar:SetWidth(200);
 	f.searchingBar:Hide();
 	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -40);
-	--f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 120, 60);
+	if E then
+		f.searchingBar:FontTemplate()
+	else
+		f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 
 	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
-	--f.searchingBarText:FontTemplate();
-	f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12)
+	if E then
+		f.searchingBarText:FontTemplate()
+	else	
+		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 	f.searchingBarText:SetAllPoints(f.searchingBar);
 	f.searchingBarText:SetJustifyH("LEFT");
 	f.searchingBarText:SetText("|cff9999ff" .. SEARCH);
@@ -396,7 +403,6 @@ function MB:CreatMailboxBankFrame()
 	----Create choose char dropdown menu
 	tinsert(UISpecialFrames, f)
 	f.chooseChar = CreateFrame('Frame', "MailboxBankFrameDropDown", f, 'UIDropDownMenuTemplate')
-	print(f.chooseChar)
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
 	
 	
@@ -411,7 +417,11 @@ function MB:CreatMailboxBankFrame()
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
 	--f.mailboxGoldText:FontTemplate()
-	f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 12)
+	if E then
+		f.mailboxGoldText:FontTemplate()
+	else
+		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 12);
+	end
 	f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	
 	----Create check time text
@@ -420,7 +430,7 @@ function MB:CreatMailboxBankFrame()
 	-- f.checktime:SetPoint("BOTTOMLEFT", 20, 5);
 	
 	----Create scroll frame
-	f.scrollBar = CreateFrame("ScrollFrame", nil, f, "FauxScrollFrameTemplate")
+	f.scrollBar = CreateFrame("ScrollFrame", "MailboxBankFrameScrollBar", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
 	f.scrollBar:SetHeight( MB_config.numItemsRows * MB_config.buttonSize + (MB_config.numItemsRows - 1) * MB_config.buttonSpacing)
@@ -449,16 +459,25 @@ function MB:CreatMailboxBankFrame()
 	local lastButton;
 	local lastRowButton;
 	for i = 1, MB_config.itemsSlotDisplay do
-		local slot = CreateFrame('Button', nil, f.Container);
+		local slot
+		if E then
+			slot = CreateFrame('Button', nil, f.Container);
+			slot:SetTemplate('Default');
+			slot:StyleButton();
+			slot:Size(MB_config.buttonSize);
+		else
+			slot = CreateFrame('Button', nil, f.Container, "ItemButtonTemplate");
+			slot:SetSize(MB_config.buttonSize, MB_config.buttonSize);
+		end
 		slot:Hide()
-		slot:SetTemplate('Default');
-		slot:StyleButton();
-		slot:Size(MB_config.buttonSize);
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
-		slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
-		--slot.count:FontTemplate()
-		slot.count:SetFont(STANDARD_TEXT_FONT, 12)
+		if E then
+			slot.count:FontTemplate()
+		else
+			slot.count:SetFont(STANDARD_TEXT_FONT, 12, 'OUTLINE');
+		end
+		--slot.count:SetFont(STANDARD_TEXT_FONT, 14)
 		slot.count:SetPoint('BOTTOMRIGHT', 0, 2);
 		
 		slot.tex = slot:CreateTexture(nil, "OVERLAY", nil)
@@ -480,15 +499,15 @@ function MB:CreatMailboxBankFrame()
 		
 		if lastButton then
 			if (i - 1) % MB_config.numItemsPerRow == 0 then
-				slot:Point('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
+				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -MB_config.buttonSpacing);
 				lastRowButton = f.Container[i];
 				numContainerRows = numContainerRows + 1;
 			else
-				slot:Point('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
+				slot:SetPoint('LEFT', lastButton, 'RIGHT', MB_config.buttonSpacing, 0);
 			end
 		else
-			slot:Point('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
-			--slot:Point('TOPLEFT', f, 'TOPLEFT', 8, -60);
+			slot:SetPoint('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
+			--slot:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -60);
 			lastRowButton = f.Container[i];
 			numContainerRows = numContainerRows + 1;
 		end
@@ -498,15 +517,23 @@ function MB:CreatMailboxBankFrame()
 	
 	---- SetScript
 	
-	f.searchingBar:SetScript("OnEscapePressed", f:GetParent():SearchBarResetAndClear());
-	f.searchingBar:SetScript("OnEnterPressed", f:GetParent():SearchBarResetAndClear());
-	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar:Hide());
+	f.searchingBar:SetScript("OnEscapePressed", function()
+		f:GetParent():SearchBarResetAndClear()
+	end);
+	f.searchingBar:SetScript("OnEnterPressed", function()
+		f:GetParent():SearchBarResetAndClear()
+	end);
+	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
 	f.searchingBar:SetScript("OnEditFocusGained", function(self)
 		self:HighlightText()
 		f:GetParent():UpdateSearch()
 	end);
-	f.searchingBar:SetScript("OnTextChanged", f:GetParent():UpdateSearch());
-	f.searchingBar:SetScript('OnChar', f:GetParent():UpdateSearch());
+	f.searchingBar:SetScript("OnTextChanged", function()
+		f:GetParent():UpdateSearch()
+	end);
+	f.searchingBar:SetScript('OnChar', function()
+		f:GetParent():UpdateSearch()
+	end);
 	
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
 		FauxScrollFrame_OnVerticalScroll(self, offset, MB_config.buttonSize + MB_config.buttonSpacing);
@@ -516,7 +543,9 @@ function MB:CreatMailboxBankFrame()
 		f:GetParent():Update()
 	end)
 	
-	f.CollectGoldButton:SetScript("OnClick", f:GetParent():CollectMoney())
+	f.CollectGoldButton:SetScript("OnClick", function()
+		f:GetParent():CollectMoney()
+	end)
 	UIDropDownMenu_Initialize(f.chooseChar, self:DropDownMenuInitialize());
 	-- return f
 end
@@ -720,7 +749,7 @@ function MB.AlertDeadlineMails()
 			break
 		end
 	end
-	if DeadlineList ~= {} then
+	if getn(DeadlineList) > 0 then
 		local alertText = L["MailboxBank: |cffaa0000: |r"]
 		for i, v in pairs(DeadlineList) do
 			alertText = alertText .. v
@@ -731,6 +760,7 @@ function MB.AlertDeadlineMails()
 end
 
 function MB:HookSendMail(recipient, subject, body)
+	if not recipient then return end
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			if recipient..'-'..GetRealmName() == k then
@@ -807,7 +837,12 @@ local function MailboxBank_OnEvent(self, event)
 		end
 	end
 	if event == "MAIL_SHOW" then
-		if not self.MB_Frame:IsVisible() then self:FrameShow(); end
+		if not self.MB_Frame:IsVisible() then 
+			print(self.MB_Frame:IsVisible())
+			self:FrameShow();
+			print(self.MB_Frame:IsVisible())
+			print(self.MB_Frame)
+		end
 	end
 	if event == "MAIL_CLOSED" then
 		self:FrameHide()
@@ -828,7 +863,8 @@ local function MailboxBank_OnEvent(self, event)
 		if not MB_DB then MB_DB = {} end
 		self:CreatMailboxBankFrame()
 		self:AlertDeadlineMails()
-		hooksecurefunc("SendMail", self:HookSendMail())
+		print(self.MB_Frame:IsVisible())
+		hooksecurefunc("SendMail", function() self:HookSendMail() end)
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
 end
