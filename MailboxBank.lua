@@ -4,14 +4,10 @@
 	--done?
 --@@ TODO: change frame's layout!
 	--holy shit..
---@@ TODO: add AH ordering
-	--UC..bad to do
 --@@ TODO: should stacked attachments can be collect??
 	--UC.. new window to produce? or pop-up ?
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. should make new function to calculate deadline time?
---@@ TODO: localization!
-	--UC.. done?
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
 --local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank")
 local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
@@ -283,16 +279,7 @@ subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemCount
 						.keyword		.itemID
 						.itemslotCount
 ]]
---		getn(itemsID)	getn(sameID)
---[[
-first get subTypeID and itemID. if got same itemID then find counts..
-oh its in the middle of some sameID? then insert in it.
-now we got subTypeID itemID. we can count out how many SubType and itemID before us.
-or, its hard to count??? shit
-for i = 1, subIdxTb.count do (ohShit!!!)
-]]
---insert and return position!
-
+--insert and return position (c)!
 --[[ revSubIdxTb structure
 				subTypeName		subType
 revSubIdxTb{	["a"] 		=	1
@@ -300,6 +287,9 @@ revSubIdxTb{	["a"] 		=	1
 				...			
 				["n"]		=	n
 				.__count = count
+]]
+--[[	build filter menu base on subType!
+if sort as normal, it can be COD, gold?
 ]]
 local SelectSortMethod = {
 	["normal"] = function(usedSlot)
@@ -349,6 +339,7 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 		slot.dayLeft = {}
 		slot.countNum = {}
 		slot.wasReturned = nil
+		slot.CODAmount = nil
 		slot.mailIndex = nil
 		slot.attachIndex = nil
 		if not MB_config.isStacked then
@@ -369,7 +360,55 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 	return slot
 end
 
+function MailboxBank_Filter_OnClick()
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, self.value);
+	MailboxBank_Update(true)
+end
+
+function MailboxBank_BuildFilter()
+	if not revSubIdxTb then return end
+	local info = UIDropDownMenu_CreateInfo();
+		info = UIDropDownMenu_CreateInfo()
+		info.text = L["All"]
+		info.value = "__all"
+		info.func = MailboxBank_Filter_OnClick;
+		UIDropDownMenu_AddButton(info, level)
+	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)=="normal" then
+	--gold only? cod only?
+	else
+		for k, v in pairs(revSubIdxTb) do
+			if k ~= "__count" then
+				info = UIDropDownMenu_CreateInfo()
+				info.text = k
+				info.value = k
+				info.func = MailboxBank_Filter_OnClick;
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end
+	end
+	-- if UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown) == nil then
+		-- UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, ____);
+	-- end
+end
+--[[ revSubIdxTb structure
+				subTypeName		subType
+revSubIdxTb{	["a"] 		=	1
+				["b"]		=	2
+				...			
+				["n"]		=	n
+				.__count = count
+]]
+function MailboxBank_Filter()
+	local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
+	if filter == "__all" then
+	
+	else
+	
+	end
+end
+
 function MailboxBank_SortDB()
+-- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
 --@@  TODO: clear up! collect garbage
 	--if not method then method = "normal" end
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
@@ -511,8 +550,13 @@ local function MailboxBank_CreatFrame(name)
 	----Create sort dropdown menu
 	tinsert(UISpecialFrames, name)
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
-	f.sortmethod:SetPoint("TOPLEFT", f, 190, -36)
+	f.sortmethod:SetPoint("TOPLEFT", f, 80, -36)
 	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
+
+	----Create filter dropdown menu
+	f.filter = CreateFrame('Frame', name..'FilterDropDown', f, 'UIDropDownMenuTemplate')
+	f.filter:SetPoint("TOPLEFT", f, 200, -36)
+	UIDropDownMenu_Initialize(f.filter, MailboxBank_FilterMenuInitialize);
 	
 	----Create choose char dropdown menu
 	--tinsert(UISpecialFrames, name)
@@ -531,7 +575,7 @@ local function MailboxBank_CreatFrame(name)
 	end
 	f.searchingBar:SetFrameLevel(f.searchingBar:GetFrameLevel() + 2);
 	f.searchingBar:SetHeight(15);
-	f.searchingBar:SetWidth(180);
+	f.searchingBar:SetWidth(80);
 	f.searchingBar:Hide();
 	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -40);
 	--f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 120, 60);
@@ -624,6 +668,7 @@ local function MailboxBank_CreatFrame(name)
 			S:HandleCloseButton(f.closeButton);
 			S:HandleCheckBox(f.stackUpCheckButton);
 			S:HandleDropDownBox(f.sortmethod)
+			S:HandleDropDownBox(f.filter)
 			S:HandleDropDownBox(f.chooseChar)
 			S:HandleButton(f.CollectGoldButton)
 			S:HandleScrollBar(f.scrollBar);
@@ -724,11 +769,11 @@ function MailboxBank_TooltipShow(self)
 			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
 			local leftday = floor(dayLeftTick / 86400)
 			if leftday > 0 then
-				lefttext = lefttext..L["greater than"]..tostring(leftday)..L["days"]
+				lefttext = lefttext..L[" greater than "]..tostring(leftday)..L[" days"]
 			else
 				local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
 				local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-				lefttext = lefttext..tostring(lefthour)..L["hours"]..tostring(leftminute)..L["minutes"]
+				lefttext = lefttext..tostring(lefthour)..L[" hours"]..tostring(leftminute)..L[" minutes"]
 			end
 			
 			local foundSameLefttime = false
@@ -767,6 +812,9 @@ function MailboxBank_TooltipShow(self)
 			end
 		end
 		
+		if self.CODAmount then
+			GameTooltip:AddDoubleLine(L["is C.O.D. item:"], GetCoinTextureString(self.CODAmount), 1, 0, 0.5)
+		end
 		if self.wasReturned == 1 then
 			GameTooltip:AddLine(L["was returned"])
 		end
@@ -838,7 +886,7 @@ function MailboxBank_UpdateContainer()
 		slot.mailIndex = slotDB[itemIndex].mailIndex
 		slot.attachIndex = slotDB[itemIndex].attachIndex
 		slot.wasReturned = slotDB[itemIndex].wasReturned
-		
+		slot.CODAmount = slotDB[itemIndex].CODAmount
 		if slot.link then
 			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
 			if slot.rarity and slot.rarity > 1 then

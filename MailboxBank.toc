@@ -3,7 +3,7 @@
 ## Title: Mailbox Bank
 ## Title-zhCN: 邮箱银行
 ## Title-zhTW: 郵箱銀行
-## Version: alpha 16_8
+## Version: alpha 16_9
 ## SavedVariables: MB_DB, MB_config
 
 Libs\LibStub\LibStub.lua
