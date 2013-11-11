@@ -318,7 +318,7 @@ local SelectSortMethod = {
 		else
 			isCOD = "not C.O.D."
 		end
-		return MailboxBank_InsertToIndexTable(isCOD, itemIndexCount, "C.O.D.")
+		return MailboxBank_InsertToIndexTable(isCOD, itemIndexCount)
 	end,
 }
 
@@ -339,7 +339,6 @@ local function MailboxBank_InsertToSlot(slot, itemIndexCount, isInit)
 			slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
 			slot.CODAmount = MB_DB[selectValue][itemIndexCount].CODAmount
 		end
-		return slot
 	end
 	if selectValue == playername then
 		if not slot.mailIndex then slot.mailIndex = {} end
@@ -356,7 +355,7 @@ local function MailboxBank_InsertToSlot(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MailboxBank_Filter_OnClick()
+function MailboxBank_Filter_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, self.value);
 	MailboxBank_Update("filter")
 end
@@ -382,15 +381,13 @@ function MailboxBank_BuildFilter()
 			else
 				t = k
 			end
-			info.text = k
+			info.text = t
 			info.value = k
 			info.func = MailboxBank_Filter_OnClick;
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown) == nil then
-		UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
-	end
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
 end
 --[[ revSubIdxTb structure
 				subTypeName		subType
@@ -451,6 +448,7 @@ end
 ---- GUI ----
 function MailboxBank_SortMethod_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
+	
 	MailboxBank_Update("sort")
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
@@ -550,6 +548,7 @@ local function MailboxBank_CreatFrame(name)
 	f.stackUpCheckButton = CreateFrame("CheckButton", name.."StackUpCheckButton", f, "UICheckButtonTemplate");
 	f.stackUpCheckButton:SetPoint("TOPLEFT", 2, -2)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
+	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
 		MailboxBank_Update("filter")
@@ -559,9 +558,9 @@ local function MailboxBank_CreatFrame(name)
 	tinsert(UISpecialFrames, name)
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
 	f.sortmethod:SetPoint("TOPLEFT", f, 80, -36)
-	--f.sortmethod:SetScript("OnValueChanged", function()
+	--[[f.sortmethod:SetScript("OnValueChanged", function()
 	
-	--end)
+	end)]]
 	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
 
 	----Create filter dropdown menu
@@ -770,7 +769,7 @@ function MailboxBank_TooltipShow(self)
 			end
 			
 			local lefttext = L["+ Left time: "]
-			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
+			local dayLeftTick = difftime(floor(self.dayLeft[i] * 86400) + self.checkMailTick,time())
 			local leftday = floor(dayLeftTick / 86400)
 			if leftday > 0 then
 				lefttext = lefttext..L["more than "]..tostring(leftday)..L[" days"]
@@ -783,8 +782,8 @@ function MailboxBank_TooltipShow(self)
 			local foundSameLefttime = false
 			for j = 1, getn(formatList[self.sender[i]]) do
 				if formatList[self.sender[i]][j].lefttext == lefttext then
-					formatList[self.sender[i]][j].righttext = formatList[self.sender[i]][j].righttext + self.countnum[i]
-					formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countnum[i]
+					formatList[self.sender[i]][j].righttext = formatList[self.sender[i]][j].righttext + self.countNum[i]
+					formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countNum[i]
 					foundSameLefttime = true
 				end
 			end
@@ -794,7 +793,7 @@ function MailboxBank_TooltipShow(self)
 				row.lefttext = lefttext
 				row.righttext = self.countNum[i]
 				row.leftday = leftday
-				formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countnum[i]
+				formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countNum[i]
 				tinsert(formatList[self.sender[i]], row)
 			end
 		end
@@ -881,12 +880,12 @@ function MailboxBank_UpdateContainer()
 		local slot = f.Container[i]
 		
 		if not MB_config.isStacked then
-			MailboxBank_InsertToSlot(slot, slotDB[itemIndex], true)		
+			slot = MailboxBank_InsertToSlot(slot, slotDB[itemIndex], true)		
 		else
-			MailboxBank_InsertToSlot(slot, slotDB[itemIndex][1], true)
+			slot = MailboxBank_InsertToSlot(slot, slotDB[itemIndex][1], true)
 			if getn(slotDB[itemIndex]) > 1 then
 				for i = 2, getn(slotDB[itemIndex]) do
-					MailboxBank_InsertToSlot(slot, slotDB[itemIndex][i])
+					slot = MailboxBank_InsertToSlot(slot, slotDB[itemIndex][i])
 				end
 			end
 		end
