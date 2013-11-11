@@ -153,7 +153,6 @@ local function MailboxBank_CollectMoney()
 	MailboxBank_Event:RegisterEvent("MAIL_INBOX_UPDATE")
 end
 
-
 local function MailboxBank_UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
 	local insertIndex
 	if revSubIdxTb["__count"] == 0 then --table is nil
@@ -294,9 +293,6 @@ revSubIdxTb{	["a"] 		=	1
 if sort as normal, it can be COD, gold?
 ]]
 local SelectSortMethod = {
-	--[[["normal"] = function(itemIndexCount, usedSlot)
-		return usedSlot + 1
-	end,]]
 	["AH"] = function(itemIndexCount)
 		if not AhSortIndex then BuildSortOrder() end
 		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
@@ -325,17 +321,7 @@ local SelectSortMethod = {
 	end,
 }
 
-local function MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
-	for i = 1, usedSlot do
-		if tonumber(match(slotDB[i].link, "item:(%d+)")) == tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)")) then
-			return slotDB[i]
-		end
-	end
-	return nil
-end
-
-local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
-----TODO: merge checkMailTick and dayLeft to leftTick
+local function MailboxBank_InsertToSlot(slot, itemIndexCount, isInit)
 	if isInit then
 		slot.link = MB_DB[selectValue][itemIndexCount].itemLink
 		slot.checkMailTick = MB_DB[selectValue].checkMailTick
@@ -371,33 +357,30 @@ end
 
 function MailboxBank_Filter_OnClick()
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, self.value);
-	MailboxBank_Update(true)
+	MailboxBank_Update("filter")
 end
 
 function MailboxBank_BuildFilter()
 	if not revSubIdxTb then return end
 	local info = UIDropDownMenu_CreateInfo();
-		info = UIDropDownMenu_CreateInfo()
-		info.text = L["All"]
-		info.value = "__all"
-		info.func = MailboxBank_Filter_OnClick;
-		UIDropDownMenu_AddButton(info, level)
-	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)=="normal" then
-	--gold only? cod only? returned only?
-	else
-		for k, v in pairs(revSubIdxTb) do
-			if k ~= "__count" then
-				info = UIDropDownMenu_CreateInfo()
-				info.text = k
-				info.value = k
-				info.func = MailboxBank_Filter_OnClick;
-				UIDropDownMenu_AddButton(info, level)
-			end
+	info = UIDropDownMenu_CreateInfo()
+	info.text = L["All"]
+	info.value = "__all"
+	info.func = MailboxBank_Filter_OnClick;
+	UIDropDownMenu_AddButton(info, level)
+
+	for k, v in pairs(revSubIdxTb) do
+		if k ~= "__count" then
+			info = UIDropDownMenu_CreateInfo()
+			info.text = k
+			info.value = k
+			info.func = MailboxBank_Filter_OnClick;
+			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	-- if UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown) == nil then
-		-- UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, ____);
-	-- end
+	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown) == nil then
+		UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
+	end
 end
 --[[ revSubIdxTb structure
 				subTypeName		subType
@@ -407,32 +390,14 @@ revSubIdxTb{	["a"] 		=	1
 				["n"]		=	n
 				.__count = count
 ]]
-function MailboxBank_Filter()
-	local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
-	if filter == "__all" then
-	
-	else
-		slotDB = {}
-		
-	end
-end
-
-function MailboxBank_NewSortDB(isSort, isFilter)
--- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
-	if isSort then
-		local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
-		subIdxTb = {}
-		revSubIdxTb = {["__count"] = 0}
-		for itemIndexCount = 1, MB_DB[selectValue].itemCount do
-			SelectSortMethod[method](itemIndexCount)
-		end
-	end
+local function MailboxBank_Filter()
 	slotDB = {}
-	local c = 0
-	if not isFilter then
+	local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
+	if not filter then filter = "__all" end
+	if filter = "__all" then
 		for i = 1, getn(subIdxTb) do
 			for j = 1, getn(subIdxTb[i]) do
-				if not stack then
+				if not MB_config.isStacked then
 					for k = 1, getn(subIdxTb[i][j]) do
 						c = c + 1
 						slotDB[c] = subIdxTb[i][j][k]
@@ -444,10 +409,9 @@ function MailboxBank_NewSortDB(isSort, isFilter)
 			end
 		end
 	else
-		local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
 		i = revSubIdxTb[filter]
 		for j = 1, getn(subIdxTb[i]) do
-			if not stack then
+			if not MB_config.isStacked then
 				for k = 1, getn(subIdxTb[i][j]) do
 					c = c + 1
 					slotDB[c] = subIdxTb[i][j][k]
@@ -460,41 +424,24 @@ function MailboxBank_NewSortDB(isSort, isFilter)
 	end
 end
 
-function MailboxBank_SortDB(isSort, isFilter)
+function MailboxBank_SortDB(isSort)
 -- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
-	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
-	subIdxTb = {}
-	revSubIdxTb = {["__count"] = 0}
-	--local usedSlot = 0
-	slotDB = {}
-	for itemIndexCount = 1, MB_DB[selectValue].itemCount do
-		local slot
-		if MB_config.isStacked then
-			slot = MailboxBank_CheckSlotFromSortDB(itemIndexCount, getn(slotDB))
-		end	
-		if not slot then
-			
-			--usedSlot = usedSlot + 1
-			--print(method)
-			local c
-			while c == nil do
-				c = SelectSortMethod[method](itemIndexCount, getn(slotDB))
-			end
-			slot = {}
-			tinsert(slotDB, c, slot)
-			slot = MailboxBank_InsertToSortDB(slot, itemIndexCount, true)
+	if isSort then
+		local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+		subIdxTb = {}
+		revSubIdxTb = {["__count"] = 0}
+		for itemIndexCount = 1, MB_DB[selectValue].itemCount do
+			SelectSortMethod[method](itemIndexCount)
 		end
-		
-		slot = MailboxBank_InsertToSortDB(slot, itemIndexCount)
 	end
-	--slotDB.usedSlot = usedSlot
-	--return slotDB
+	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, MailboxBank_BuildFilter);
+	MailboxBank_Filter()
 end
 
 ---- GUI ----
 function MailboxBank_SortMethod_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
-	MailboxBank_Update(true)
+	MailboxBank_Update("sort")
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
 	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
@@ -524,7 +471,7 @@ function MailboxBank_ChooseChar_OnClick(self)
 	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "normal");
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameDropDown, self.value);
 	MailboxBank_SearchBarResetAndClear()
-	MailboxBank_Update(true)
+	MailboxBank_Update("sort")
 	
 	local text = MailboxBankFrameDropDownText;
 	local width = text:GetStringWidth();
@@ -595,19 +542,22 @@ local function MailboxBank_CreatFrame(name)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
 		MB_config.isStacked = self:GetChecked()
-		MailboxBank_Update(true)
+		MailboxBank_Update("filter")
 	end)
 
 	----Create sort dropdown menu
 	tinsert(UISpecialFrames, name)
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
 	f.sortmethod:SetPoint("TOPLEFT", f, 80, -36)
+	f.sortmethod:SetScript("", function()
+	
+	end}
 	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
 
 	----Create filter dropdown menu
 	f.filter = CreateFrame('Frame', name..'FilterDropDown', f, 'UIDropDownMenuTemplate')
 	f.filter:SetPoint("TOPLEFT", f, 200, -36)
-	UIDropDownMenu_Initialize(f.filter, MailboxBank_FilterMenuInitialize);
+	--UIDropDownMenu_Initialize(f.filter, MailboxBank_FilterMenuInitialize);
 	
 	----Create choose char dropdown menu
 	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
@@ -889,7 +839,7 @@ function MailboxBank_SlotClick(self,button)
 			for i = 1 , getn(self.mailIndex) do
 				TakeInboxItem(self.mailIndex[i], self.attachIndex[i])
 			end
-			MailboxBank_Update(true)
+			MailboxBank_Update("sort")
 		end
 	end
 end
@@ -901,7 +851,7 @@ function MailboxBank_UpdateContainer()
 			f.Container[i]:Hide()
 		end
 	end
-	f.stackUpCheckButton:SetChecked(MB_config.isStacked)
+	--f.stackUpCheckButton:SetChecked(MB_config.isStacked)
 	if not slotDB then return end
 	
 	f.mailboxGoldText:SetText(L["Mailbox gold: "]..GetCoinTextureString(MB_DB[selectValue].money))
@@ -918,30 +868,29 @@ function MailboxBank_UpdateContainer()
 	
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
-		
 		local slot = f.Container[i]
-		slot.link = slotDB[itemIndex].link
-		slot.checkMailTick = slotDB[itemIndex].checkMailTick
-		slot.sender = slotDB[itemIndex].sender
-		slot.dayleft = slotDB[itemIndex].dayLeft
-		slot.countnum = slotDB[itemIndex].countNum
 		
-		slot.mailIndex = slotDB[itemIndex].mailIndex
-		slot.attachIndex = slotDB[itemIndex].attachIndex
-		slot.wasReturned = slotDB[itemIndex].wasReturned
-		slot.CODAmount = slotDB[itemIndex].CODAmount
+		if not MB_config.isStacked then
+			MailboxBank_InsertToSlot(slot, slotDB[itemIndex], true)		
+		else
+			MailboxBank_InsertToSlot(slot, slotDB[itemIndex][1], true)
+			if getn(slotDB[itemIndex]) > 1 then
+				for i = 2, getn(slotDB[itemIndex]) do
+					MailboxBank_InsertToSlot(slot, slotDB[itemIndex][i])
+				end
+			end
+		end
+
 		if slot.link then
 			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
 			if slot.rarity and slot.rarity > 1 then
 				local r, g, b = GetItemQualityColor(slot.rarity);
 				slot:SetBackdropBorderColor(r, g, b);
 			else
-				--slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
 				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 			end
 			slot.tex:SetTexture(slot.texture)
 		else
-			--slot:SetBackdropBorderColor(unpack(E.media.bordercolor));
 			slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 		end
 		
@@ -973,7 +922,11 @@ function MailboxBank_UpdateContainer()
 end
 
 function MailboxBank_Update(isSortDB)
-	if isSortDB then MailboxBank_SortDB() end
+	if isSortDB == "sort" then
+		MailboxBank_SortDB()
+	elseif isSortDB == "filter" then
+		MailboxBank_Filter()
+	end
 	MailboxBank_UpdateContainer()
 end
 
@@ -1022,7 +975,7 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 					MB_DB[recipient..'-'..GetRealmName()].money = MB_DB[recipient..'-'..GetRealmName()].money + Sendmoney
 				end
 				if MailboxBankFrame:IsVisible() and selectValue == k then
-					MailboxBank_Update(true)
+					MailboxBank_Update("sort")
 				end
 				return
 			end
@@ -1045,7 +998,7 @@ local function MailboxBank_OnEvent(self, event, args)
 	if event == "MAIL_INBOX_UPDATE" then
 		MailboxBank_CheckMail()
 		if selectValue == playername then
-			MailboxBank_Update(true)
+			MailboxBank_Update("sort")
 		end
 	end
 	if event == "MAIL_SHOW" then
@@ -1088,7 +1041,7 @@ SlashCmdList["MAILBOXBANK"] = function()
 	if MailboxBankFrame:IsVisible() then
 		MailboxBank_Hide()
 	else
-		MailboxBank_Update(true)
+		MailboxBank_Update("sort")
 		MailboxBank_Show()
 	end
 end;

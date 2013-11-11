@@ -8,6 +8,7 @@ if L then
 	L["quality"] = "品質"
 	L["left day"] = "剩餘時間"
 	L["C.O.D."] = "付費取件"
+	L["All"] = "全部"
 	L["Collect gold"] = "收取金幣"
 	L["Sender: "]  = "發件人: "
 	L["+ Left time: "] = "+ 剩餘 "
