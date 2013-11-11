@@ -21,7 +21,8 @@ local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectValue = playername
 local slotDB
 
-local MB = CreateFrame("Frame")
+local MB = CreateFrame("Frame", nil , UIParent)
+MB:SetPoint("CENTER", 0, 0)
 
 MB.config_init = {
 	daysLeftYellow = 5,
@@ -301,7 +302,8 @@ function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
 	local E
 	if ElvUI then E = unpack(ElvUI) end
-	self.MB_Frame = {}
+	--self.MB_Frame = {}
+	--self.MB_Frame = CreateFrame("Frame", nil , UIParent)
 	self.MB_Frame = CreateFrame("Frame", nil , UIParent)
 	print(self.MB_Frame)
 	local f = self.MB_Frame
@@ -321,7 +323,7 @@ function MB:CreatMailboxBankFrame()
 	f:SetFrameStrata("DIALOG");
 	f:SetWidth(MB_config.frameWidth)
 	f:SetHeight(MB_config.frameHeight)
-	f:SetPoint("CENTER", 0, 0)
+	f:SetPoint("CENTER",self,"CENTER", 0, 0)
 	--f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
@@ -332,7 +334,7 @@ function MB:CreatMailboxBankFrame()
 		self:StopMovingOrSizing()
 		MB_config.p, MB_config.pf, MB_config.pa, MB_config.px, MB_config.py = self:GetPoint()
 	end)
-	f:Hide()
+	--f:Hide()
 	
 	----Create close button
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
