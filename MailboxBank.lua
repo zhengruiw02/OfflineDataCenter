@@ -1,7 +1,5 @@
 --@@ TODO: solve COD item, maybe displaying COD amount above the slot icon or using tool-tip
 	--UC..don't know how to layout in tool-tip..
---@@ TODO: function SortDB must clear up! collect garbage !!!
-	--done?
 --@@ TODO: change frame's layout!
 	--holy shit..
 --@@ TODO: should stacked attachments can be collect??
@@ -19,7 +17,7 @@ local selectValue = playername
 local slotDB, subIdxTb, revSubIdxTb
 
 local MailboxBank_Config_init = {
-	daysLeftYellow = 5,
+	daysLeftYellow = 7,
 	daysLeftRed = 3,
 	buttonSize = 36,
 	buttonSpacing = 4,
@@ -106,8 +104,8 @@ local function MailboxBank_CheckMail(isCollectMoney)
 	--return true
 end
 
-local function MailboxBank_CalcDeadline()
-
+local function MailboxBank_CalcLeftDay(player, itemIndex)
+	return floor(difftime(floor(MB_DB[player][itemIndex].daysLeft * 86400) + MB_DB[player].checkMailTick,time()) / 86400)
 end
 
 local function MailboxBank_SearchReset()
@@ -180,7 +178,7 @@ local function MailboxBank_UpdateRevIndexTable(keyword, method) --keyword as [se
 				break
 			end
 		end
-	elseif method == "quality" then
+	elseif method == "quality" or method == "left day" then --keyword is sortable
 		for i, v in ipairs(subIdxTb) do --table is not empty
 			if subIdxTb[i].keyword > keyword then --can insert before end of table
 				for ii = i, revSubIdxTb.__count do --move items after current key
@@ -203,16 +201,17 @@ local function MailboxBank_UpdateRevIndexTable(keyword, method) --keyword as [se
 	tinsert(subIdxTb, insertIndex, t)
 end
 
-local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method)
-	if not keyword or not itemID or not itemCount then return end
+local function MailboxBank_InsertToIndexTable(keyword, itemIndexCount, method)
+	if not keyword or not itemIndexCount then return end
+	local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
 	if not revSubIdxTb[keyword] then
 		 MailboxBank_UpdateRevIndexTable(keyword, method)
 	end
 	local subIdx = revSubIdxTb[keyword]
 	local c = 0
 	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
-		subIdxTb[subIdx][1] = {["itemID"] = itemID,["count"] = 1}
-		subIdxTb[subIdx][1][1] = itemCount
+		subIdxTb[subIdx][1] = {["itemID"] = itemID}--,["count"] = 1}
+		subIdxTb[subIdx][1][1] = itemIndexCount
 		subIdxTb[subIdx].itemslotCount = 1
 		for i = 1, subIdx do
 			c = c + subIdxTb[i].itemslotCount
@@ -221,7 +220,7 @@ local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method
 	else
 		for i, v in ipairs(subIdxTb[subIdx]) do
 			if subIdxTb[subIdx][i].itemID > itemID then --can insert before end of table
-				local t = {[1] = itemCount, ["itemID"] = itemID}
+				local t = {[1] = itemIndexCount, ["itemID"] = itemID}
 				tinsert(subIdxTb[subIdx], i, t)
 				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 				for ii = 1, subIdx - 1 do
@@ -233,8 +232,8 @@ local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method
 				return c
 			elseif subIdxTb[subIdx][i].itemID == itemID then
 				for ii, v in ipairs(subIdxTb[subIdx][i]) do
-					if v > itemCount then
-						tinsert(subIdxTb[subIdx][i], ii, itemCount)
+					if MB_DB[selectValue][v].count >  MB_DB[selectValue][itemIndexCount].count then
+						tinsert(subIdxTb[subIdx][i], ii, itemIndexCount)
 						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 						for iii = 1, subIdx - 1 do
 							c = c + subIdxTb[iii].itemslotCount
@@ -245,7 +244,7 @@ local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method
 						c = c + ii
 						return c
 					elseif ii == getn(subIdxTb[subIdx][i]) then
-						tinsert(subIdxTb[subIdx][i], itemCount)
+						tinsert(subIdxTb[subIdx][i], itemIndexCount)
 						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 						for iii = 1, subIdx - 1 do
 							c = c + subIdxTb[iii].itemslotCount
@@ -257,7 +256,7 @@ local function MailboxBank_InsertToIndexTable(keyword, itemID, itemCount, method
 					end
 				end
 			elseif i == getn(subIdxTb[subIdx]) then  --insert to end of table
-				local t = {[1] = itemCount, ["itemID"] = itemID}
+				local t = {[1] = itemIndexCount, ["itemID"] = itemID}
 				tinsert(subIdxTb[subIdx], t)
 				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 				for ii = 1, subIdx do
@@ -272,7 +271,7 @@ end
 --revSubIdxTb, subIdxTb
 --[[ subIdxTb structure
 			subType		itemsID			sameID items	slot?
-subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemCount
+subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemIndexCount(.itemCount)
 			[2]			[2]				[2]
 			...			...				...
 			[n]			[n]				[n]
@@ -280,6 +279,9 @@ subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemCount
 						.itemslotCount
 ]]
 --insert and return position (c)!
+--先排序，再看过滤器，最后看堆叠
+--排序已经完成，过滤器就是从排序当中得到子表。
+--堆叠就是把同itemID的当做一个表插入到sortDB
 --[[ revSubIdxTb structure
 				subTypeName		subType
 revSubIdxTb{	["a"] 		=	1
@@ -292,33 +294,35 @@ revSubIdxTb{	["a"] 		=	1
 if sort as normal, it can be COD, gold?
 ]]
 local SelectSortMethod = {
-	["normal"] = function(usedSlot)
-		return usedSlot
-	end,
-	["AH"] = function(usedSlot, itemIndexCount)
-		if not AhSortIndex then BuildSortOrder() end
-		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
-		local itemCount = MB_DB[selectValue][itemIndexCount].count
-		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
-		return MailboxBank_InsertToIndexTable(itemSubType, itemID, itemCount, "AH")	
-	end,
-	["sender"] = function(usedSlot, itemIndexCount)
-		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
-		local itemCount = MB_DB[selectValue][itemIndexCount].count
-		local sender = MB_DB[selectValue][itemIndexCount].sender
-		return MailboxBank_InsertToIndexTable(sender, itemID, itemCount)	
-	end,
-	["quality"] = function(usedSlot, itemIndexCount)
-		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
-		local itemCount = MB_DB[selectValue][itemIndexCount].count
-		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndexCount].itemLink)
-		return MailboxBank_InsertToIndexTable(quality, itemID, itemCount, "quality")
-	end,
-	--[[["codOnly"] = function(usedSlot, itemIndexCount)
-		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
-		local itemCount = MB_DB[selectValue][itemIndexCount].count
-		local cod = "sender"
+	--[[["normal"] = function(itemIndexCount, usedSlot)
+		return usedSlot + 1
 	end,]]
+	["AH"] = function(itemIndexCount)
+		if not AhSortIndex then BuildSortOrder() end
+		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
+		return MailboxBank_InsertToIndexTable(itemSubType, itemIndexCount, "AH")	
+	end,
+	["sender"] = function(itemIndexCount)
+		local sender = MB_DB[selectValue][itemIndexCount].sender
+		return MailboxBank_InsertToIndexTable(sender, itemIndexCount)	
+	end,
+	["quality"] = function(itemIndexCount)
+		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectValue][itemIndexCount].itemLink)
+		return MailboxBank_InsertToIndexTable(quality, itemIndexCount, "quality")
+	end,
+	["left day"] = function(itemIndexCount)
+		local leftday = MailboxBank_CalcLeftDay(selectValue, itemIndexCount)
+		return MailboxBank_InsertToIndexTable(leftday, itemIndexCount, "left day")
+	end,
+	["C.O.D."] = function(itemIndexCount)
+		local isCOD
+		if MB_DB[selectValue][itemIndexCount].CODAmount then
+			isCOD = "is C.O.D."
+		else
+			isCOD = "not C.O.D."
+		end
+		return MailboxBank_InsertToIndexTable(isCOD, itemIndexCount, "C.O.D.")
+	end,
 }
 
 local function MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
@@ -342,6 +346,8 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 		slot.CODAmount = nil
 		slot.mailIndex = nil
 		slot.attachIndex = nil
+		-- slot.wasReturned = {}
+		-- slot.CODAmount = {}
 		if not MB_config.isStacked then
 			slot.wasReturned = MB_DB[selectValue][itemIndexCount].wasReturned
 			slot.CODAmount = MB_DB[selectValue][itemIndexCount].CODAmount
@@ -357,6 +363,9 @@ local function MailboxBank_InsertToSortDB(slot, itemIndexCount, isInit)
 	tinsert(slot.sender , MB_DB[selectValue][itemIndexCount].sender)
 	tinsert(slot.dayLeft , MB_DB[selectValue][itemIndexCount].daysLeft)
 	tinsert(slot.countNum , MB_DB[selectValue][itemIndexCount].count)
+	-- local index = getn(slot.dayLeft)
+	-- tinsert(slot.wasReturned, index, MB_DB[selectValue][itemIndexCount].wasReturned)
+	-- tinsert(slot.CODAmount, index, MB_DB[selectValue][itemIndexCount].CODAmount)
 	return slot
 end
 
@@ -374,7 +383,7 @@ function MailboxBank_BuildFilter()
 		info.func = MailboxBank_Filter_OnClick;
 		UIDropDownMenu_AddButton(info, level)
 	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)=="normal" then
-	--gold only? cod only?
+	--gold only? cod only? returned only?
 	else
 		for k, v in pairs(revSubIdxTb) do
 			if k ~= "__count" then
@@ -403,31 +412,73 @@ function MailboxBank_Filter()
 	if filter == "__all" then
 	
 	else
-	
+		slotDB = {}
+		
 	end
 end
 
-function MailboxBank_SortDB()
+function MailboxBank_NewSortDB(isSort, isFilter)
 -- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
---@@  TODO: clear up! collect garbage
-	--if not method then method = "normal" end
+	if isSort then
+		local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+		subIdxTb = {}
+		revSubIdxTb = {["__count"] = 0}
+		for itemIndexCount = 1, MB_DB[selectValue].itemCount do
+			SelectSortMethod[method](itemIndexCount)
+		end
+	end
+	slotDB = {}
+	local c = 0
+	if not isFilter then
+		for i = 1, getn(subIdxTb) do
+			for j = 1, getn(subIdxTb[i]) do
+				if not stack then
+					for k = 1, getn(subIdxTb[i][j]) do
+						c = c + 1
+						slotDB[c] = subIdxTb[i][j][k]
+					end
+				else
+					c = c + 1
+					slotDB[c] = subIdxTb[i][j]
+				end
+			end
+		end
+	else
+		local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
+		i = revSubIdxTb[filter]
+		for j = 1, getn(subIdxTb[i]) do
+			if not stack then
+				for k = 1, getn(subIdxTb[i][j]) do
+					c = c + 1
+					slotDB[c] = subIdxTb[i][j][k]
+				end
+			else
+				c = c + 1
+				slotDB[c] = subIdxTb[i][j]
+			end
+		end
+	end
+end
+
+function MailboxBank_SortDB(isSort, isFilter)
+-- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	subIdxTb = {}
 	revSubIdxTb = {["__count"] = 0}
-	local usedSlot = 0
+	--local usedSlot = 0
 	slotDB = {}
 	for itemIndexCount = 1, MB_DB[selectValue].itemCount do
 		local slot
 		if MB_config.isStacked then
-			slot = MailboxBank_CheckSlotFromSortDB(itemIndexCount, usedSlot)
+			slot = MailboxBank_CheckSlotFromSortDB(itemIndexCount, getn(slotDB))
 		end	
 		if not slot then
 			
-			usedSlot = usedSlot + 1
+			--usedSlot = usedSlot + 1
 			--print(method)
 			local c
 			while c == nil do
-				c = SelectSortMethod[method](usedSlot, itemIndexCount)
+				c = SelectSortMethod[method](itemIndexCount, getn(slotDB))
 			end
 			slot = {}
 			tinsert(slotDB, c, slot)
@@ -436,7 +487,7 @@ function MailboxBank_SortDB()
 		
 		slot = MailboxBank_InsertToSortDB(slot, itemIndexCount)
 	end
-	slotDB.usedSlot = usedSlot
+	--slotDB.usedSlot = usedSlot
 	--return slotDB
 end
 
@@ -460,7 +511,7 @@ local function MailboxBank_SortMenuInitialize()
 			UIDropDownMenu_AddButton(info, level)
 	end
 	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
-		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "normal");
+		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "left day");
 	end
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
@@ -559,7 +610,6 @@ local function MailboxBank_CreatFrame(name)
 	UIDropDownMenu_Initialize(f.filter, MailboxBank_FilterMenuInitialize);
 	
 	----Create choose char dropdown menu
-	--tinsert(UISpecialFrames, name)
 	f.chooseChar = CreateFrame('Frame', name..'DropDown', f, 'UIDropDownMenuTemplate')
 	f.chooseChar:SetPoint("TOPLEFT", f, 80, -6)
 	
@@ -695,12 +745,9 @@ local function MailboxBank_CreatFrame(name)
 
 		end
 		slot:Hide()
-		--slot:SetTemplate('Default');
-		--slot:StyleButton();
 		slot:SetSize(MB_config.buttonSize, MB_config.buttonSize);
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
-		--slot.count:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
 		if E then
 			slot.count:FontTemplate()
 		else
@@ -735,14 +782,11 @@ local function MailboxBank_CreatFrame(name)
 			end
 		else
 			slot:SetPoint('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
-			--slot:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -60);
 			lastRowButton = f.Container[i];
 			numContainerRows = numContainerRows + 1;
 		end
 		lastButton = f.Container[i];
 	end
-	
-	-- return f
 end
 
 function MailboxBank_TooltipShow(self)
@@ -765,11 +809,11 @@ function MailboxBank_TooltipShow(self)
 				tinsert(formatList[self.sender[i]], row)
 			end
 			
-			local lefttext = L["+ Left time"]
+			local lefttext = L["+ Left time: "]
 			local dayLeftTick = difftime(floor(self.dayleft[i] * 86400) + self.checkMailTick,time())
 			local leftday = floor(dayLeftTick / 86400)
 			if leftday > 0 then
-				lefttext = lefttext..L[" greater than "]..tostring(leftday)..L[" days"]
+				lefttext = lefttext..L["more than "]..tostring(leftday)..L[" days"]
 			else
 				local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
 				local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
@@ -813,7 +857,7 @@ function MailboxBank_TooltipShow(self)
 		end
 		
 		if self.CODAmount then
-			GameTooltip:AddDoubleLine(L["is C.O.D. item:"], GetCoinTextureString(self.CODAmount), 1, 0, 0.5)
+			GameTooltip:AddDoubleLine(L["C.O.D. item"], L["pay for: "]..GetCoinTextureString(self.CODAmount), 1, 0, 0.5)
 		end
 		if self.wasReturned == 1 then
 			GameTooltip:AddLine(L["was returned"])
@@ -848,7 +892,6 @@ function MailboxBank_SlotClick(self,button)
 			MailboxBank_Update(true)
 		end
 	end
-
 end
 
 function MailboxBank_UpdateContainer()
@@ -867,10 +910,10 @@ function MailboxBank_UpdateContainer()
 	local offset = FauxScrollFrame_GetOffset(f.scrollBar)
 	
 	local iconDisplayCount
-	if (slotDB.usedSlot - offset * 8) > MB_config.itemsSlotDisplay then
+	if (getn(slotDB) - offset * 8) > MB_config.itemsSlotDisplay then
 		iconDisplayCount = MB_config.itemsSlotDisplay
 	else
-		iconDisplayCount = slotDB.usedSlot - offset * 8
+		iconDisplayCount = getn(slotDB) - offset * 8
 	end
 	
 	for i = 1, iconDisplayCount do
@@ -910,6 +953,7 @@ function MailboxBank_UpdateContainer()
 		
 		slot.tex:SetVertexColor(1, 1, 1)
 		slot.count:SetTextColor(1, 1, 1)
+		slot.tex:SetDesaturated(0)
 		if slot.CODAmount then
 			slot.tex:SetDesaturated(1)
 		end
@@ -925,7 +969,7 @@ function MailboxBank_UpdateContainer()
 
 		slot:Show()
 	end
-	FauxScrollFrame_Update(f.scrollBar, ceil(slotDB.usedSlot / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
+	FauxScrollFrame_Update(f.scrollBar, ceil(getn(slotDB) / MB_config.numItemsPerRow) , MB_config.numItemsRows, MB_config.buttonSize + MB_config.buttonSpacing );
 end
 
 function MailboxBank_Update(isSortDB)
@@ -934,20 +978,27 @@ function MailboxBank_Update(isSortDB)
 end
 
 function MailboxBank_AlertDeadlineMails()
-	if not MB_DB[playername] then return end
 	local DeadlineList = {}
-	for i = MB_DB[playername].itemCount , 1, -1 do
-		local dayLeft = floor(difftime(floor(MB_DB[playername][i].daysLeft * 86400) + MB_DB[playername].checkMailTick,time()) / 86400)
-		if dayLeft < 3 then
-			tinsert(DeadlineList, MB_DB[playername][i].itemLink)
-		else
-			break
+	for k, v in pairs(MB_DB) do
+		if type(k) == 'string' and type(v) == 'table' then
+			for i = MB_DB[k].itemCount , 1, -1 do
+				local dayLeft = MailboxBank_CalcLeftDay(k, i)
+				if dayLeft < 3 then
+					if not DeadlineList.k then DeadlineList.k = {} end
+					tinsert(DeadlineList.k, MB_DB[k][i].itemLink)
+				else
+					break
+				end
+			end
 		end
 	end
 	if getn(DeadlineList) > 0 then
 		local alertText = L["MailboxBank: |cffaa0000: |r"]
-		for i, v in pairs(DeadlineList) do
-			alertText = alertText .. v
+		for k, t in pairs(DeadlineList) do
+			alertText = alertText .. "[" .. k .. "]: "
+			for i, v in pairs(t) do
+				alertText = alertText .. v
+			end
 		end
 		alertText = alertText .. L["|cffaa0000Please remember to check it!|r"]
 		print(alertText)
@@ -958,6 +1009,7 @@ local function MailboxBank_HookSendMail(recipient, subject, body)
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			if recipient..'-'..GetRealmName() == k then
+				--TODO: find out whether is C.O.D. or send money
 				local Sendmoney = GetSendMailMoney()
 				for i = ATTACHMENTS_MAX_RECEIVE, 1, -1 do
 					local Name, _, count, _ = GetSendMailItem(i)
