@@ -295,6 +295,7 @@ if sort as normal, it can be COD, gold?
 local SelectSortMethod = {
 	["AH"] = function(itemIndexCount)
 		if not AhSortIndex then BuildSortOrder() end
+		local itemID = tonumber(match(MB_DB[selectValue][itemIndexCount].itemLink, "item:(%d+)"))
 		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
 		return MailboxBank_InsertToIndexTable(itemSubType, itemIndexCount, "AH")	
 	end,
@@ -372,6 +373,15 @@ function MailboxBank_BuildFilter()
 	for k, v in pairs(revSubIdxTb) do
 		if k ~= "__count" then
 			info = UIDropDownMenu_CreateInfo()
+			local t
+			local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+			if method == "quality" then
+				t = _G["ITEM_QUALITY"..k.."_DESC"]
+			elseif method == "left day" then
+				t = k .. L[" days"]
+			else
+				t = k
+			end
 			info.text = k
 			info.value = k
 			info.func = MailboxBank_Filter_OnClick;
@@ -391,10 +401,12 @@ revSubIdxTb{	["a"] 		=	1
 				.__count = count
 ]]
 local function MailboxBank_Filter()
+	if not subIdxTb then return end
 	slotDB = {}
 	local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
 	if not filter then filter = "__all" end
-	if filter = "__all" then
+	local c = 0
+	if filter == "__all" then
 		for i = 1, getn(subIdxTb) do
 			for j = 1, getn(subIdxTb[i]) do
 				if not MB_config.isStacked then
@@ -424,15 +436,13 @@ local function MailboxBank_Filter()
 	end
 end
 
-function MailboxBank_SortDB(isSort)
+function MailboxBank_SortDB()
 -- TODO: 分离几种事件情况，独立处理选择排序，选择过滤等。
-	if isSort then
-		local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
-		subIdxTb = {}
-		revSubIdxTb = {["__count"] = 0}
-		for itemIndexCount = 1, MB_DB[selectValue].itemCount do
-			SelectSortMethod[method](itemIndexCount)
-		end
+	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+	subIdxTb = {}
+	revSubIdxTb = {["__count"] = 0}
+	for itemIndexCount = 1, MB_DB[selectValue].itemCount do
+		SelectSortMethod[method](itemIndexCount)
 	end
 	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, MailboxBank_BuildFilter);
 	MailboxBank_Filter()
@@ -549,9 +559,9 @@ local function MailboxBank_CreatFrame(name)
 	tinsert(UISpecialFrames, name)
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
 	f.sortmethod:SetPoint("TOPLEFT", f, 80, -36)
-	f.sortmethod:SetScript("", function()
+	--f.sortmethod:SetScript("OnValueChanged", function()
 	
-	end}
+	--end)
 	UIDropDownMenu_Initialize(f.sortmethod, MailboxBank_SortMenuInitialize);
 
 	----Create filter dropdown menu
@@ -750,7 +760,7 @@ function MailboxBank_TooltipShow(self)
 		GameTooltip:SetHyperlink(self.link)
 		
 		local formatList = {}
-		for i = 1 , getn(self.countnum) do
+		for i = 1 , getn(self.countNum) do
 			if formatList[self.sender[i]] == nil then
 				formatList[self.sender[i]] = {}
 				local row = {}
@@ -782,7 +792,7 @@ function MailboxBank_TooltipShow(self)
 			if foundSameLefttime == false then
 				local row = {}
 				row.lefttext = lefttext
-				row.righttext = self.countnum[i]
+				row.righttext = self.countNum[i]
 				row.leftday = leftday
 				formatList[self.sender[i]][1].righttext = formatList[self.sender[i]][1].righttext + self.countnum[i]
 				tinsert(formatList[self.sender[i]], row)
@@ -895,8 +905,8 @@ function MailboxBank_UpdateContainer()
 		end
 		
 		local countnum = 0
-		for i = 1 , getn(slot.countnum) do
-			countnum = countnum + slot.countnum[i]
+		for i = 1 , getn(slot.countNum) do
+			countnum = countnum + slot.countNum[i]
 		end
 		slot.count:SetText(countnum > 1 and countnum or '');
 		
