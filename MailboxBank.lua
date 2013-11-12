@@ -3,7 +3,7 @@
 --@@ TODO: change frame's layout!
 	--holy shit..
 --@@ TODO: should stacked attachments can be collect??
-	--UC.. new window to produce? or pop-up ?
+	--UC.. new window to produce? or pop-up ? COD to collect?
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. should make new function to calculate deadline time?
 --local E, L, V, P, G, _ = unpack(ElvUI); --Import: Engine, Locales, PrivateDB, ProfileDB, GlobalDB, Localize Underscore
@@ -106,10 +106,6 @@ function MB:CalcLeftDay(player, itemIndex)
 	return floor(difftime(floor(MB_DB[player][itemIndex].daysLeft * 86400) + MB_DB[player].checkMailTick,time()) / 86400)
 end
 
-function MB:SearchReset()
-	self:Update()
-end
-
 function MB:UpdateSearch()
 	local MIN_REPEAT_CHARACTERS = 3;
 	local searchString = self.searchingBar:GetText();
@@ -123,6 +119,7 @@ function MB:UpdateSearch()
 		end
 		if ( repeatChar ) then
 			self:SearchBarResetAndClear();
+			self:Update();
 			return;
 		end
 	end
@@ -140,12 +137,13 @@ function MB:SearchBarResetAndClear()
 	self.searchingBarText:Show();
 	self.searchingBar:ClearFocus();
 	self.searchingBar:SetText("");
-	self:Update()
 end
 
 function MB:CollectMoney()
 	self:CheckMail(true)
 end
+
+---- Sorting ----
 
 function MB:UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
 	local insertIndex
@@ -349,40 +347,6 @@ function MB:InsertToSlot(slot, itemIndexCount, isInit)
 	return slot
 end
 
-function MB:Filter_OnClick(self, info)
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, info.value);
-	self:Update("filter")
-end
-
-function MB:BuildFilter()
-	if not revSubIdxTb then return end
-	local info = UIDropDownMenu_CreateInfo();
-	info = UIDropDownMenu_CreateInfo()
-	info.text = L["All"]
-	info.value = "__all"
-	info.func = self:Filter_OnClick(self, info);
-	UIDropDownMenu_AddButton(info, level)
-
-	for k, v in pairs(revSubIdxTb) do
-		if k ~= "__count" then
-			info = UIDropDownMenu_CreateInfo()
-			local t
-			local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
-			if method == "quality" then
-				t = _G["ITEM_QUALITY"..k.."_DESC"]
-			elseif method == "left day" then
-				t = k .. L[" days"]
-			else
-				t = k
-			end
-			info.text = t
-			info.value = k
-			info.func = self:Filter_OnClick(self, info);
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
-end
 
 function MB:Filter()
 	if not subIdxTb then return end
@@ -428,28 +392,72 @@ function MB:SortDB()
 	for itemIndexCount = 1, MB_DB[selectChar].itemCount do
 		self.SelectSortMethod[method](self, itemIndexCount)
 	end
-	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, self:BuildFilter());
+	local f = self
+	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, function(self)
+		f:FilterMenuInitialize(self, f)
+	end)
 	self:Filter()
 end
 
 ---- GUI ----
-function MB:SortMethod_OnClick(self, value)
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, value);
-	
-	self:Update("sort")
+
+function MB:Filter_OnClick(self, f)
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, self.value);
+	f:Update("filter")
+end
+
+function MB:FilterMenuInitialize(self, f)
+	if not revSubIdxTb then return end
+	local info = UIDropDownMenu_CreateInfo();
+	info = UIDropDownMenu_CreateInfo()
+	info.text = L["All"]
+	info.value = "__all"
+	info.func = function(self)
+		f:Filter_OnClick(self, f)
+	end;
+	UIDropDownMenu_AddButton(info, level)
+
+	for k, v in pairs(revSubIdxTb) do
+		if k ~= "__count" then
+			info = UIDropDownMenu_CreateInfo()
+			local t
+			local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+			if method == "quality" then
+				t = _G["ITEM_QUALITY"..k.."_DESC"]
+			elseif method == "left day" then
+				t = k .. L[" days"]
+			else
+				t = k
+			end
+			info.text = t
+			info.value = k
+			info.func = function(self)
+				f:Filter_OnClick(self, f)
+			end;
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
+end
+
+function MB:SortMethod_OnClick(self, f)
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
+	f:Update("sort")
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
 	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
 	--MailboxBankFrameSortDropDown:SetWidth(width+60)	
 end
 
-function MB:SortMenuInitialize()
+function MB:SortMenuInitialize(self, f)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(self.SelectSortMethod) do
+	for k, v in pairs(f.SelectSortMethod) do
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L[k]
 			info.value = k
-			info.func = self:SortMethod_OnClick(self, info);
+			info.func = function(self)
+				f:SortMethod_OnClick(self, f)
+			end;
 			UIDropDownMenu_AddButton(info, level)
 	end
 	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
@@ -461,11 +469,10 @@ function MB:SortMenuInitialize()
 	--MailboxBankFrameSortDropDown:SetWidth(width+60)
 end
 
-function MB:ChooseChar_OnClick(f, value)
-
+function MB:ChooseChar_OnClick(self, f) ---!!!
+	selectValue = value
+	UIDropDownMenu_SetSelectedValue(f.chooseChar, self.value);
 	f:SearchBarResetAndClear()
-	selectChar = value
-	UIDropDownMenu_SetSelectedValue(f.chooseChar, value);	
 	f:Update("sort")
 	
 	local text = MailboxBankFrameChooseCharDropDownText;
@@ -473,6 +480,27 @@ function MB:ChooseChar_OnClick(f, value)
 	UIDropDownMenu_SetWidth(f.chooseChar, width+40);
 	f.chooseChar:SetWidth(width+60)	
 end
+
+function MB:ChooseCharMenuInitialize(self, f)
+	local info = UIDropDownMenu_CreateInfo();
+	for k, v in pairs(MB_DB) do
+		if type(k) == 'string' and type(v) == 'table' then
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = k
+			info.value = k
+			info.func = function(self)
+				f:ChooseChar_OnClick(self, f)
+			end;
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+	UIDropDownMenu_SetSelectedValue(f.chooseChar, selectValue);
+	local text = MailboxBankFrameChooseCharDropDownText;
+	local width = text:GetStringWidth();
+	UIDropDownMenu_SetWidth(f.chooseChar, width+40);
+	f.chooseChar:SetWidth(width+60)
+end
+
 
 function MB:CreatMailboxBankFrame()
 	----Create mailbox bank frame
@@ -707,9 +735,11 @@ function MB:CreatMailboxBankFrame()
 	
 	f.searchingBar:SetScript("OnEscapePressed", function()
 		f:SearchBarResetAndClear()
+		f:Update()
 	end);
 	f.searchingBar:SetScript("OnEnterPressed", function()
 		f:SearchBarResetAndClear()
+		f:Update()
 	end);
 	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
 	f.searchingBar:SetScript("OnEditFocusGained", function(self)
@@ -734,33 +764,14 @@ function MB:CreatMailboxBankFrame()
 	f.CollectGoldButton:SetScript("OnClick", function()
 		f:CollectMoney()
 	end)
+	
 	UIDropDownMenu_Initialize(f.chooseChar, function(self)
-		for k, v in pairs(MB_DB) do
-			if type(k) == 'string' and type(v) == 'table' then
-				local info = UIDropDownMenu_CreateInfo()
-				info.text = k
-				info.value = k
-				info.func = f:ChooseChar_OnClick(f, info.value)
-				UIDropDownMenu_AddButton(info, level)
-			end
-		end
-		UIDropDownMenu_SetSelectedValue(f.chooseChar, selectChar);
-		local text = MailboxBankFrameChooseCharDropDownText;
-		local width = text:GetStringWidth();
-		UIDropDownMenu_SetWidth(f.chooseChar, width+40);
-		f.chooseChar:SetWidth(width+60)
-	end);
+		f:ChooseCharMenuInitialize(self, f)
+	end)
 	
 	UIDropDownMenu_Initialize(f.sortmethod, function(self)
-		for k, v in pairs(f.SelectSortMethod) do
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = L[k]
-			info.value = k
-			info.func = f:SortMethod_OnClick(f, info.value);
-			UIDropDownMenu_AddButton(info, level)
-		end
-		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "left day");
-	end);
+		f:SortMenuInitialize(self, f)
+	end)
 end
 
 function MB:TooltipShow(self)--self=slot
@@ -948,7 +959,7 @@ end
 function MB:Update(isSortDB)
 	if not MB:IsVisible() then return end
 	if not self.SortDB then return end
-	if not selectChar then return end
+	--if not selectChar then return end
 	if isSortDB == "sort" then
 		self:SortDB()
 	elseif isSortDB == "filter" then
@@ -1012,6 +1023,7 @@ function MB:HookSendMail(recipient, subject, body)
 end
 
 function MB:FrameShow()
+	self:UpdateContainer()
 	self:Show()
 end
 
