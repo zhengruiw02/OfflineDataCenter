@@ -15,6 +15,7 @@ local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectChar = playername
 local slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectedSlot
+local codMoney, codMailIndex, codAttachmentIndex
 
 local MB = CreateFrame("Frame", nil , UIParent)
 
@@ -58,15 +59,30 @@ StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
 }
 
 function MB:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, CODAmount, wasReturned, recipient)
+--[[	if not recipient then
+		if not MB_DB[playername][mailIndex] then
+			MB_DB[playername][mailIndex] = {}
+			MB_DB[playername][mailIndex].sender = sender
+			MB_DB[playername][mailIndex].daysLeft = daysLeft
+			MB_DB[playername][mailIndex].wasReturned = wasReturned
+			MB_DB[playername][mailIndex].CODAmount = CODAmount
+		end
+		MB_DB[playername][mailIndex][attachIndex] = {}
+		MB_DB[playername][mailIndex][attachIndex].count = count
+		MB_DB[playername][mailIndex][attachIndex].itemLink = itemLink
+	else
+	
+	end]]
+	
 	local item = {}
-	item["sender"] = sender
+	item["sender"] = sender --same
 	item["count"] = count
 	item["itemLink"] = itemLink
-	item["daysLeft"] = daysLeft
-	item["mailIndex"] = mailIndex
+	item["daysLeft"] = daysLeft --s
+	item["mailIndex"] = mailIndex --s
 	item["attachIndex"] = attachIndex
-	if CODAmount > 0 then item["CODAmount"] = CODAmount end
-	if wasReturned then item["wasReturned"] = wasReturned end
+	if CODAmount > 0 then item["CODAmount"] = CODAmount end --s
+	if wasReturned then item["wasReturned"] = wasReturned end --s
 	if recipient then
 		tinsert(MB_DB[recipient], 1, item)
 		MB_DB[recipient].itemCount = MB_DB[recipient].itemCount + 1
@@ -75,7 +91,29 @@ function MB:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, C
 		MB_DB[playername].itemCount = MB_DB[playername].itemCount + 1
 	end
 end
+--[[
+new structure:
+				mailIndex	attachIndex
+[charName] = {	[1]			[1]			{	.count .itemLink
+				[n]			.sender .daysLeft .wasReturned .CODAmount?
 
+enum:
+for i = 1, getn(mailIndex) do
+	curr.sender, curr.daysLeft, curr.wasReturned, curr.CODAmount
+	for j = 1, ATTACHMENTS_MAX_RECEIVE do
+		if MB_DB[charName].i.j then
+			
+		end
+	end
+end
+
+get position(sortDB, filter, updateContainer):
+from i, j (mailIndex, attachIndex)
+
+old:
+[charName] = {	[1]		{	.sender .count .itemLink .daysLeft .mailIndex
+							.attachIndex .wasReturned .CODAmount?
+]]
 function MB:CheckMail(isCollectMoney)
 	if isCollectMoney and MB_DB[playername].money == 0 then return end
 	MB_DB[playername] = {itemCount = 0, money = 0}
@@ -318,7 +356,9 @@ MB.SelectSortMethod = {
 }
 
 function MB:SummingForQuality(itemIndexCount)
+	if not itemIndexCount or not selectChar then return end
 	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectChar][itemIndexCount].itemLink)
+	if not quality then return end
 	if not sumQuality[quality] then sumQuality[quality] = 0 end
 	local count = MB_DB[selectChar][itemIndexCount].count
 	sumQuality[quality] = sumQuality[quality] + count
@@ -334,7 +374,7 @@ function MB:Filter()
 	if filter == "__all" then
 		for i = 1, getn(subIdxTb) do
 			for j = 1, getn(subIdxTb[i]) do
-				if not self.config_const.isStacked then
+				if not MB_config.isStacked then
 					for k = 1, getn(subIdxTb[i][j]) do
 						c = c + 1
 						slotDB[c] = subIdxTb[i][j][k]
@@ -350,7 +390,7 @@ function MB:Filter()
 	else
 		i = revSubIdxTb[filter]
 		for j = 1, getn(subIdxTb[i]) do
-			if not self.config_const.isStacked then
+			if not MB_config.isStacked then
 				for k = 1, getn(subIdxTb[i][j]) do
 					c = c + 1
 					slotDB[c] = subIdxTb[i][j][k]
@@ -393,7 +433,7 @@ function MB:InsertToSlot(slot, itemIndexCount, isInit)
 		slot.attachIndex = nil
 		-- slot.wasReturned = {}
 		-- slot.CODAmount = {}
-		if not self.config_const.isStacked then
+		if not MB_config.isStacked then
 			slot.wasReturned = MB_DB[selectChar][itemIndexCount].wasReturned
 			slot.CODAmount = MB_DB[selectChar][itemIndexCount].CODAmount
 		end
@@ -426,7 +466,7 @@ function MB:UpdateContainer()
 	for i = 1, 7 do
 		if sumQuality[i] then
 			local _,_,_,colorCode = GetItemQualityColor(i)
-			sumQ = sumQ.." |c"..colorCode.._G["ITEM_QUALITY"..i.."_DESC"]..": "..sumQuality[i].."|r"
+			sumQ = sumQ.."|c"..colorCode.._G["ITEM_QUALITY"..i.."_DESC"]..": "..sumQuality[i].."|r "
 		end
 	end
 	self.mailboxGoldText:SetText(L["Mailbox gold: "]..GetCoinTextureString(MB_DB[selectChar].money).."\r\n"..sumQ)
@@ -445,7 +485,7 @@ function MB:UpdateContainer()
 		local itemIndex = i + offset * 8
 		local slot = self.Container[i]
 		
-		if not self.config_const.isStacked then
+		if not MB_config.isStacked then
 			slot = self:InsertToSlot(slot, slotDB[itemIndex], true)		
 		else
 			slot = self:InsertToSlot(slot, slotDB[itemIndex][1], true)
@@ -729,13 +769,10 @@ function MB:CreateMailboxBankFrame()
 	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
 	f.sortmethod:SetPoint("BOTTOMLEFT", f.searchingBar, 0, -36)
 	
-
 	----Create filter dropdown menu
 	f.filter = CreateFrame('Frame', name..'FilterDropDown', f, 'UIDropDownMenuTemplate')
 	f.filter:SetPoint("LEFT", f.sortmethod, 150, 0)
 	--UIDropDownMenu_Initialize(f.filter, f:FilterMenuInitialize);
-	
-
 	
 	----Create collect mailbox gold button
 	--[[f.CollectGoldButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate");
@@ -749,10 +786,11 @@ function MB:CreateMailboxBankFrame()
 	if E then
 		f.mailboxGoldText:FontTemplate()
 	else
-		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 12);
+		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 14);
 	end
 	--f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	f.mailboxGoldText:SetPoint("BOTTOMLEFT", 10, 5);
+	f.mailboxGoldText:SetJustifyH("LEFT");
 	
 	----Create check time text
 	-- f.checktime = f:CreateFontString(nil, 'OVERLAY');
@@ -789,7 +827,7 @@ function MB:CreateMailboxBankFrame()
 	
 	----Create Container
 	f.Container = CreateFrame('Frame', nil, f);
-	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -85);
+	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -90);
 	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container:Show()
 	
@@ -875,7 +913,7 @@ function MB:CreateMailboxBankFrame()
 	end);
 	
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, self.config_const.buttonSize + self.config_const.buttonSpacing);
+		FauxScrollFrame_OnVerticalScroll(self, offset, f.config_const.buttonSize + f.config_const.buttonSpacing);
 		f:Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
@@ -1018,6 +1056,21 @@ function MB:TooltipShow(self)--self=slot
 	end
 end
 
+StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
+    text = COD_CONFIRMATION,
+    button1 = ACCEPT,
+    button2 = CANCEL,
+    OnAccept = function(self)
+        TakeInboxItem(codMailIndex, codAttachmentIndex);
+    end,
+    OnShow = function(self)
+        MoneyFrame_Update(self.moneyFrame, codMoney);
+    end,
+    hasMoneyFrame = 1,
+    timeout = 0,
+    hideOnEscape = 1
+};
+
 function MB:SlotClick(self,button)----self=slot
 	local msg = self.link
 	if not msg then return; end
@@ -1038,15 +1091,21 @@ function MB:SlotClick(self,button)----self=slot
 	elseif button == 'LeftButton' then
 		if self.CODAmount then
 			if self.CODAmount > GetMoney() then
+				SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
 				StaticPopup_Show("COD_ALERT");
 			else
-				--OpenMailFrame.lastTakeAttachment = index;
-				StaticPopup_Show("COD_CONFIRMATION");
+				codMoney, codMailIndex, codAttachmentIndex = self.CODAmount, self.mailIndex, self.attachIndex
+				SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
+				StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+				-- InboxFrame.openMailID = self.mailIndex;
+				-- OpenMailFrame.lastTakeAttachment = self.attachIndex;
+				-- OpenMailFrame.cod = self.CODAmount
+				-- StaticPopup_Show("COD_CONFIRMATION");
 				--OpenMailFrame.updateButtonPositions = false;
 			end
 			--selectedSlot = self
 			--StaticPopup_Show("COD_ALERT");
-			--StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+			
 		else
 			if self.mailIndex and self.attachIndex then
 				for i = getn(self.mailIndex), 1, -1 do
@@ -1059,13 +1118,17 @@ function MB:SlotClick(self,button)----self=slot
 end
 
 function MB:AlertDeadlineMails()
-	local DeadlineList = {}
+	local DeadlineList = {["__count"] = 0}
 	for k, v in pairs(MB_DB) do
+		--print(k)
 		if type(k) == 'string' and type(v) == 'table' then
 			for i = MB_DB[k].itemCount , 1, -1 do
 				local dayLeft = self:CalcLeftDay(k, i)
 				if dayLeft < 3 then
-					if not DeadlineList.k then DeadlineList.k = {} end
+					if not DeadlineList.k then 
+						DeadlineList.k = {["__count"] = 0}
+						DeadlineList.__count = DeadlineList.__count +1
+					end
 					tinsert(DeadlineList.k, MB_DB[k][i].itemLink)
 				else
 					break
@@ -1073,12 +1136,14 @@ function MB:AlertDeadlineMails()
 			end
 		end
 	end
-	if getn(DeadlineList) > 0 then
+	if DeadlineList.__count > 0 then
 		local alertText = L["MailboxBank: |cffaa0000You have mails soon expire: |r"]
 		for k, t in pairs(DeadlineList) do
-			alertText = alertText .. "[" .. k .. "]: "
-			for i, v in pairs(t) do
-				alertText = alertText .. v
+			if k ~= "__count" then
+				alertText = alertText.."\[".. k .. "\]: "
+				for i, v in pairs(t) do
+					alertText = alertText .. v
+				end
 			end
 		end
 		alertText = alertText .. L["|cffaa0000Please remember to check it!|r"]
