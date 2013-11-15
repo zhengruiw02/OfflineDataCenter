@@ -338,8 +338,9 @@ revSubIdxTb{	["a"] 		=	1
 if sort as normal, it can be COD, gold?
 ]]
 
-function MB:SummingForQuality(mailIndex, attachIndex)
-	if not itemIndexCount or not selectChar then return end
+function MB:SummingForQuality(slotdb)
+	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
+	if not mailIndex or not attachIndex or not selectChar then return end
 	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectChar][mailIndex][attachIndex].itemLink)
 	if not quality then return end
 	if not sumQuality[quality] then sumQuality[quality] = 0 end
@@ -398,7 +399,6 @@ function MB:SortDB()
 		for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
 			if MB_DB[selectChar][mailIndex][attachIndex] then
 				self.SelectSortMethod[method](self, mailIndex, attachIndex)
-				print(format("%s , %s sortdb",mailIndex, attachIndex))
 			end
 		end
 	end
@@ -414,7 +414,6 @@ end
 
 function MB:InsertToSlot(slot, slotdb, isInit)
 	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
-	print(format("%s , %s insert",mailIndex, attachIndex))
 	if isInit then
 		slot.link = MB_DB[selectChar][mailIndex][attachIndex].itemLink
 		slot.checkMailTick = MB_DB[selectChar].checkMailTick
