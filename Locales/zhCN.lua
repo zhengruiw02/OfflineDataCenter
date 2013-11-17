@@ -11,6 +11,7 @@ if L then
 	L["left day"] = "剩余时间"
 	--L["C.O.D."] = "付费取件"
 	L["C.O.D."] = COD
+	L["money"] = MONEY
 	L["Collect gold"] = "收取金币"
 	L["Sender: "]  = "发件人: "
 	L["+ Left time: "] = "+ 剩余 "
