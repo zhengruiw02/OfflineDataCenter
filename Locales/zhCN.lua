@@ -1,26 +1,28 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("MailboxBank", "zhCN")
 if L then
+	L["MailboxBank"] = "邮箱银行"
 	L["UNKNOWN SENDER"] = "\[未知发件人\]"
 	L["Stack items"] = "堆叠物品"
 	L["normal"] = "普通"
 	L["AH"] = "拍卖行"
 	L["sender"] = "发件人"
-	L["quality"] = "品质"
+	--L["quality"] = "品质"
+	L["quality"] = QUALITY
 	L["left day"] = "剩余时间"
-	L["C.O.D."] = "付费取件"
-	L["All"] = "全部"
+	--L["C.O.D."] = "付费取件"
+	L["C.O.D."] = COD
 	L["Collect gold"] = "收取金币"
 	L["Sender: "]  = "发件人: "
 	L["+ Left time: "] = "+ 剩余 "
 	L["more than "] = "大于"
-	L["C.O.D. item"] = "付费取件物品"
+	--L["C.O.D. item"] = "付费取件物品"
+	L["C.O.D. item"] = COD.." "..ITEMS
 	L["pay for: "] = "需付費: "
 	L[" days"] = "天"
 	L[" hours"] = "小时"
 	L[" minutes"] = "分钟"
 	L["was returned"] = "已被退回"
 	L["Mailbox gold: "] = "邮箱金币: "
-	L["MailboxBank: |cffaa0000You have mails soon expire: |r"] = "MailboxBank: |cffaa0000您的邮箱有快到期的附件: |r"
-	L["|cffaa0000Please remember to check it!|r"] = "|cffaa0000请注意查收!|r"
+	L[": |cff00aabbYou have mails soon expire: |r"] = ": |cffaa0000您的邮箱有快到期的附件: |r"
 	--L[""] = ""
 end

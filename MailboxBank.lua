@@ -7,7 +7,7 @@
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. to optimize
 
---@@ TODO: optimize & multiple same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
+--@@ TODO: optimize & combine same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
 --local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank")
 local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
 local getn, tinsert = table.getn, table.insert
@@ -16,7 +16,7 @@ local len, sub, find, format, match = string.len, string.sub, string.find, strin
 local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectChar = playername
 local slotDB, subIdxTb, revSubIdxTb, sumQuality
-local selectedSlot
+local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
 
 local MB = CreateFrame("Frame", nil , UIParent)
@@ -24,15 +24,15 @@ local MB = CreateFrame("Frame", nil , UIParent)
 MB.config_const = {
 	daysLeftYellow = 7,
 	daysLeftRed = 3,
+	daysLeftWarning = 5,
 	buttonSize = 36,
 	buttonSpacing = 4,
 	numItemsPerRow = 8,
-	numItemsRows = 10,
-	itemsSlotDisplay = 80,
-	frameWidth = 350,
+	numItemsRows = 5,
+	itemsSlotDisplay = 40,
+	frameWidth = 360,
 	frameHeight = 580,
 	rowcount = 8,
-	maxrow = 10,
 }
 
 MB.config_init = {
@@ -53,7 +53,7 @@ function MB:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, m
 		reciever = playername
 	end
 	
-	if not MB_DB[reciever][mailIndex] then
+	if not MB_DB[reciever][mailIndex] or firstItem then
 		MB_DB[reciever][mailIndex] = {}
 		MB_DB[reciever][mailIndex].sender = sender
 		MB_DB[reciever][mailIndex].daysLeft = daysLeft
@@ -74,7 +74,7 @@ new structure:
 				mailIndex	attachIndex
 [charName] = {	[1]			[1]			{	.count .itemLink
 				[n]			.sender .daysLeft .wasReturned .CODAmount?
-
+				.mailCount .itemCount
 enum:
 for i = 1, getn(mailIndex) do
 	curr.sender, curr.daysLeft, curr.wasReturned, curr.CODAmount
@@ -186,7 +186,7 @@ end
 
 function MB:UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
 	local insertIndex
-	if revSubIdxTb["__count"] == 0 then --table is nil
+	if revSubIdxTb.__count == 0 then --table is nil
 		revSubIdxTb.__count = revSubIdxTb.__count + 1
 		insertIndex = revSubIdxTb.__count
 	elseif not method then --add to last
@@ -232,13 +232,21 @@ function MB:UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommo
 end
 
 function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
-	if not keyword or not mailIndex or not attachIndex then return end
-	local itemID = tonumber(match(MB_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
+	if not keyword or not mailIndex then return end
 	if not revSubIdxTb[keyword] then
 		 self:UpdateRevIndexTable(keyword, method)
 	end
 	local subIdx = revSubIdxTb[keyword]
-	local itemIdxTb = {["mailIndex"] = mailIndex,["attachIndex"] = attachIndex}
+	if method == "money" then
+		if keyword then
+			tinsert(subIdxTb[subIdx], mailIndex)
+			print("done!")
+		end
+		return
+	end
+	if not attachIndex then return end
+	local itemID = tonumber(match(MB_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
+	local itemIdxTb = {mailIndex = mailIndex,attachIndex = attachIndex}
 	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
 		subIdxTb[subIdx][1] = {["itemID"] = itemID}--,["count"] = 1}
 		subIdxTb[subIdx][1][1] = itemIdxTb
@@ -247,7 +255,7 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 	else
 		for i, v in ipairs(subIdxTb[subIdx]) do
 			if subIdxTb[subIdx][i].itemID > itemID then --can insert before end of table
-				local t = {[1] = itemIdxTb, ["itemID"] = itemID}
+				local t = {[1] = itemIdxTb, itemID = itemID}
 				tinsert(subIdxTb[subIdx], i, t)
 				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 				return
@@ -264,7 +272,7 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 					end
 				end
 			elseif i == getn(subIdxTb[subIdx]) then  --insert to end of table
-				local t = {[1] = itemIdxTb, ["itemID"] = itemID}
+				local t = {[1] = itemIdxTb, itemID = itemID}
 				tinsert(subIdxTb[subIdx], t)
 				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
 				return
@@ -301,25 +309,23 @@ MB.SelectSortMethod = {
 		end
 		self:InsertToIndexTable(isCOD, mailIndex, attachIndex)
 	end,
---[[	["money"] = function(self, mailIndex, attachIndex)
-		local isCOD
-		if MB_DB[selectChar][mailIndex][attachIndex].CODAmount then
-			isCOD = "is C.O.D."
-		else
-			isCOD = "not C.O.D."
+	["money"] = function(self, mailIndex)
+		local hasMoney
+		if MB_DB[selectChar][mailIndex].money then
+			hasMoney = "has money"
 		end
-		self:InsertToIndexTable(isCOD, mailIndex, attachIndex)
-	end,]]
+		self:InsertToIndexTable(hasMoney, mailIndex, nil, "money")
+	end,
 }
 
 --revSubIdxTb, subIdxTb
 --[[ subIdxTb structure
 			subType		itemsID			sameID items	slot?
 subIdxTb{	[1]		{ 	[1]			{	[1]		=		itemIndexCount(.itemCount)
-			[2]			[2]				[2]				==> [mailIndex, attachIndex](.itemCount)
+			[2]			[2]				[2]				==>{ [mailIndex, attachIndex](.itemCount)
 			...			...				...
 			[n]			[n]				[n]
-						.keyword		.itemID
+			.method		.keyword		.itemID
 						.itemslotCount
 ]]
 --insert and return position (c)!
@@ -347,6 +353,34 @@ function MB:SummingForQuality(slotdb)
 	local count = MB_DB[selectChar][mailIndex][attachIndex].count
 	sumQuality[quality] = sumQuality[quality] + count
 end
+--[[
+structure of slotDB:
+slotDB{		[1]		{	[1].mailIndex (.attachIndex/.isMoney)
+			[2]			[2]
+slotDB{		[1]		.mailIndex (when method is money)
+			[2]		
+]]
+function MB:SubSubFilter()
+
+end
+
+function MB:SubFilter(i, c)
+	for j = 1, getn(subIdxTb[i]) do
+		if not MB_config.isStacked then
+			for k = 1, getn(subIdxTb[i][j]) do
+				c = c + 1
+				slotDB[c] = subIdxTb[i][j][k]
+				self:SummingForQuality(slotDB[c])
+			end
+		else
+			c = c + 1
+			slotDB[c] = subIdxTb[i][j]
+			for k = 1, getn(subIdxTb[i][j]) do
+				self:SummingForQuality(subIdxTb[i][j][k])
+			end
+		end
+	end
+end
 
 function MB:Filter()
 	if not subIdxTb then return end
@@ -355,37 +389,23 @@ function MB:Filter()
 	local filter = UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown)
 	if not filter then filter = "__all" end
 	local c = 0
+	
+	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+	if method == "money" then
+		for i = 1, getn(subIdxTb[1]) do
+			c = c + 1
+			print(subIdxTb[1][i])
+			slotDB[c] = subIdxTb[1][i]
+		end
+		return
+	end
 	if filter == "__all" then
 		for i = 1, getn(subIdxTb) do
-			for j = 1, getn(subIdxTb[i]) do
-				if not MB_config.isStacked then
-					for k = 1, getn(subIdxTb[i][j]) do
-						c = c + 1
-						slotDB[c] = subIdxTb[i][j][k]
-						self:SummingForQuality(slotDB[c])
-					end
-				else
-					c = c + 1
-					slotDB[c] = subIdxTb[i][j]
-					self:SummingForQuality(slotDB[c])
-				end
-			end
+			self:SubFilter(i, c)
 		end
 	else
 		i = revSubIdxTb[filter]
-		for j = 1, getn(subIdxTb[i]) do
-			if not MB_config.isStacked then
-				for k = 1, getn(subIdxTb[i][j]) do
-					c = c + 1
-					slotDB[c] = subIdxTb[i][j][k]
-					self:SummingForQuality(slotDB[c])
-				end
-			else
-				c = c + 1
-				slotDB[c] = subIdxTb[i][j]
-				self:SummingForQuality(slotDB[c])
-			end
-		end
+		self:SubFilter(i, c)
 	end
 end
 
@@ -393,18 +413,23 @@ function MB:SortDB()
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	if not method then return end
 	subIdxTb = {}
-	revSubIdxTb = {["__count"] = 0}
+	--subIdxTb.method = method
+	revSubIdxTb = {__count = 0}
 	if not MB_DB[selectChar] then return end
 	for mailIndex = 1, MB_DB[selectChar].mailCount do
-		for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
-			if MB_DB[selectChar][mailIndex][attachIndex] then
-				self.SelectSortMethod[method](self, mailIndex, attachIndex)
+		if not MB_DB[selectChar][mailIndex] then return end
+		if method == "money" then
+			if MB_DB[selectChar][mailIndex].money then
+				self.SelectSortMethod[method](self, mailIndex)
+			end
+		else
+			for attachIndex, t in pairs(MB_DB[selectChar][mailIndex]) do
+				if type(t) == "table" then
+					self.SelectSortMethod[method](self, mailIndex, attachIndex)
+				end
 			end
 		end
 	end
-	-- for itemIndexCount = 1, MB_DB[selectChar].itemCount do
-		-- self.SelectSortMethod[method](self, itemIndexCount)
-	-- end
 	local f = self
 	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, function(self)
 		f:FilterMenuInitialize(self, f)
@@ -412,10 +437,21 @@ function MB:SortDB()
 	self:Filter()
 end
 
-function MB:InsertToSlot(slot, slotdb, isInit)
-	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
+function MB:InsertToSlot(slot, slotdb, isInit, isMoney)
+	local mailIndex, attachIndex
+	if isMoney then
+		mailIndex = slotdb
+	else
+		mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
+	end
+	
+	if not mailIndex then return end
 	if isInit then
-		slot.link = MB_DB[selectChar][mailIndex][attachIndex].itemLink
+		if not isMoney then
+			slot.link = MB_DB[selectChar][mailIndex][attachIndex].itemLink ----wrong!!?
+		else
+			slot.link = nil
+		end
 		slot.checkMailTick = MB_DB[selectChar].checkMailTick
 		slot.sender = {}
 		slot.dayLeft = {}
@@ -433,13 +469,17 @@ function MB:InsertToSlot(slot, slotdb, isInit)
 	end
 	if selectChar == playername then
 		if not slot.mailIndex then slot.mailIndex = {} end
-		if not slot.attachIndex then slot.attachIndex = {} end
 		tinsert(slot.mailIndex , mailIndex)
-		tinsert(slot.attachIndex , attachIndex)
+		if not isMoney then
+			if not slot.attachIndex then slot.attachIndex = {} end
+			tinsert(slot.attachIndex , attachIndex)
+		end
 	end
 	tinsert(slot.sender , MB_DB[selectChar][mailIndex].sender)
 	tinsert(slot.dayLeft , MB_DB[selectChar][mailIndex].daysLeft)
-	tinsert(slot.countNum , MB_DB[selectChar][mailIndex][attachIndex].count)
+	if not isMoney then
+		tinsert(slot.countNum , MB_DB[selectChar][mailIndex][attachIndex].count)
+	end
 	-- local index = getn(slot.dayLeft)
 	-- tinsert(slot.wasReturned, index, MB_DB[selectChar][itemIndexCount].wasReturned)
 	-- tinsert(slot.CODAmount, index, MB_DB[selectChar][itemIndexCount].CODAmount)
@@ -474,60 +514,79 @@ function MB:UpdateContainer()
 		iconDisplayCount = getn(slotDB) - offset * 8
 	end
 	
+--[[
+structure of slotDB:
+slotDB{		[1]		{	[1].mailIndex (.attachIndex/.isMoney)
+			[2]			[2]
+]]
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
 		local slot = self.Container[i]
 		
-		if not MB_config.isStacked then
-			slot = self:InsertToSlot(slot, slotDB[itemIndex], true)		
+		local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
+		if method == "money" then
+			local mailIndex = slotDB[itemIndex]
+			--print(mailIndex)
+			slot = self:InsertToSlot(slot, slotDB[itemIndex], true, true)
+			local money = MB_DB[selectChar][mailIndex].money
+			slot.tex:SetTexture(GetCoinIcon(money))
+
 		else
-			slot = self:InsertToSlot(slot, slotDB[itemIndex][1], true)
-			if getn(slotDB[itemIndex]) > 1 then
-				for i = 2, getn(slotDB[itemIndex]) do
-					slot = self:InsertToSlot(slot, slotDB[itemIndex][i])
+			
+			if not MB_config.isStacked then
+				slot = self:InsertToSlot(slot, slotDB[itemIndex], true)		
+			else
+				slot = self:InsertToSlot(slot, slotDB[itemIndex][1], true)
+				if getn(slotDB[itemIndex]) > 1 then
+					for i = 2, getn(slotDB[itemIndex]) do
+						slot = self:InsertToSlot(slot, slotDB[itemIndex][i])
+					end
 				end
 			end
-		end
-
-		if slot.link then
-			slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
-			if slot.rarity and slot.rarity > 1 then
-				local r, g, b = GetItemQualityColor(slot.rarity);
-				slot:SetBackdropBorderColor(r, g, b);
+			--slot.link = MB_DB[selectChar][mailIndex][attachIndex].itemLink
+			--if MB_DB[selectChar][mailIndex][attachIndex].itemLink then
+			
+			--end
+			if slot.link then
+				slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
+				if slot.rarity and slot.rarity > 1 then
+					local r, g, b = GetItemQualityColor(slot.rarity);
+					slot:SetBackdropBorderColor(r, g, b);
+				else
+					slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
+				end
+				slot.tex:SetTexture(slot.texture)
 			else
 				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 			end
-			slot.tex:SetTexture(slot.texture)
-		else
-			slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
-		end
-		
-		local countnum = 0
-		for i = 1 , getn(slot.countNum) do
-			countnum = countnum + slot.countNum[i]
-		end
-		slot.count:SetText(countnum > 1 and countnum or '');
-		
-		slot.tex:SetVertexColor(1, 1, 1)
-		slot.count:SetTextColor(1, 1, 1)
-		
-		if slot.CODAmount then
-			slot.tex:SetDesaturated(1)
-			slot.cod:Show()
-		else
-			slot.tex:SetDesaturated(0)
-			slot.cod:Hide()
-		end
-		if self.searchingBar:HasFocus() then
-			if not slot.name then break end
-			local searchingStr = self.searchingBar:GetText();
-			if not find(slot.name, searchingStr) then
-				slot.tex:SetVertexColor(0.25, 0.25, 0.25)
-				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
-				slot.count:SetTextColor(0.3, 0.3, 0.3)
+			
+			local countnum = 0
+			for i = 1 , getn(slot.countNum) do
+				countnum = countnum + slot.countNum[i]
+			end
+			slot.count:SetText(countnum > 1 and countnum or '');
+			
+			slot.tex:SetVertexColor(1, 1, 1)
+			slot.count:SetTextColor(1, 1, 1)
+			
+			if slot.CODAmount then
+				slot.tex:SetDesaturated(1)
+				slot.cod:Show()
+			else
+				slot.tex:SetDesaturated(0)
+				slot.cod:Hide()
+			end
+			if self.searchingBar:HasFocus() then
+				if not slot.name then break end
+				local searchingStr = self.searchingBar:GetText();
+				if not find(slot.name, searchingStr) then
+					slot.tex:SetVertexColor(0.25, 0.25, 0.25)
+					slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
+					slot.count:SetTextColor(0.3, 0.3, 0.3)
+				end
 			end
 		end
-
+		
 		slot:Show()
 	end
 	FauxScrollFrame_Update(self.scrollBar, ceil(getn(slotDB) / self.config_const.numItemsPerRow) , self.config_const.numItemsRows, self.config_const.buttonSize + self.config_const.buttonSpacing );
@@ -582,11 +641,16 @@ function MB:FilterMenuInitialize(self, f)
 		end;
 		UIDropDownMenu_AddButton(info, level)
 	end
-	UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
+	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameFilterDropDown) == nil or selectSortChanged == true then
+		UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
+		selectSortChanged = nil
+	end
+	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
 end
 
 function MB:SortMethod_OnClick(self, f)
 	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, self.value);
+	selectSortChanged = true
 	f:Update("sort")
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
@@ -666,7 +730,6 @@ function MB:CreateMailboxBankFrame()
 	f:SetFrameStrata("DIALOG");
 	f:SetWidth(self.config_const.frameWidth)
 	f:SetHeight(self.config_const.frameHeight)
-	--f:SetPoint("CENTER", 0, 0)
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
@@ -689,7 +752,7 @@ function MB:CreateMailboxBankFrame()
 		f.headline:SetFont(STANDARD_TEXT_FONT, 14);
 	end
 	f.headline:SetPoint("TOPLEFT", 10, -10);
-	f.headline:SetText("MailboxBank")
+	f.headline:SetText(L["MailboxBank"])
 	
 	----Create choose char dropdown menu
 	f.chooseChar = CreateFrame('Frame', name..'ChooseCharDropDown', f, 'UIDropDownMenuTemplate')
@@ -787,7 +850,7 @@ function MB:CreateMailboxBankFrame()
 	end
 	--f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	f.mailboxGoldText:SetPoint("BOTTOMLEFT", 10, 5);
-	--f.mailboxGoldText:SetJustifyH("LEFT");
+	f.mailboxGoldText:SetJustifyH("LEFT");
 	
 	----Create check time text
 	-- f.checktime = f:CreateFontString(nil, 'OVERLAY');
@@ -824,7 +887,7 @@ function MB:CreateMailboxBankFrame()
 	
 	----Create Container
 	f.Container = CreateFrame('Frame', nil, f);
-	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -90);
+	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -90);
 	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container:Show()
 	
@@ -990,6 +1053,7 @@ function MB:TooltipShow(self)--self=slot
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
 		end
 		GameTooltip:SetHyperlink(self.link)
+	end
 		
 		local formatList = {}
 		for i = 1 , getn(self.countNum) do
@@ -1056,7 +1120,7 @@ function MB:TooltipShow(self)--self=slot
 		end
 
 		GameTooltip:Show()
-	end
+
 end
 
 StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
@@ -1091,24 +1155,16 @@ function MB:SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' then
+	elseif button == 'LeftButton' and not MB_config.isStacked then
 		if self.CODAmount then
 			if self.CODAmount > GetMoney() then
 				SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
 				StaticPopup_Show("COD_ALERT");
 			else
-				codMoney, codMailIndex, codAttachmentIndex = self.CODAmount, self.mailIndex, self.attachIndex
+				codMoney, codMailIndex, codAttachmentIndex = self.CODAmount, self.mailIndex[1], self.attachIndex[1]
 				SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
 				StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
-				-- InboxFrame.openMailID = self.mailIndex;
-				-- OpenMailFrame.lastTakeAttachment = self.attachIndex;
-				-- OpenMailFrame.cod = self.CODAmount
-				-- StaticPopup_Show("COD_CONFIRMATION");
-				--OpenMailFrame.updateButtonPositions = false;
 			end
-			--selectedSlot = self
-			--StaticPopup_Show("COD_ALERT");
-			
 		else
 			if self.mailIndex and self.attachIndex then
 				for i = getn(self.mailIndex), 1, -1 do
@@ -1123,16 +1179,20 @@ end
 function MB:AlertDeadlineMails()
 	local DeadlineList = {["__count"] = 0}
 	for k, v in pairs(MB_DB) do
-		--print(k)
 		if type(k) == 'string' and type(v) == 'table' then
-			for i = MB_DB[k].itemCount , 1, -1 do
+		--.mailCount .itemCount
+			for i = MB_DB[k].mailCount , 1, -1 do
 				local dayLeft = self:CalcLeftDay(k, i)
-				if dayLeft < 3 then
-					if not DeadlineList.k then 
-						DeadlineList.k = {["__count"] = 0}
+				if dayLeft < self.config_const.daysLeftWarning then
+					if not DeadlineList[k] then 
+						DeadlineList[k] = {}
 						DeadlineList.__count = DeadlineList.__count +1
 					end
-					tinsert(DeadlineList.k, MB_DB[k][i].itemLink)
+					for j, u in pairs(MB_DB[k][i]) do
+						if type(u) == "table" then
+							tinsert(DeadlineList[k], u.itemLink)
+						end
+					end
 				else
 					break
 				end
@@ -1140,33 +1200,35 @@ function MB:AlertDeadlineMails()
 		end
 	end
 	if DeadlineList.__count > 0 then
-		local alertText = L["MailboxBank: |cffaa0000You have mails soon expire: |r"]
+		local alertText = L["MailboxBank"] .. L[": |cff00aabbYou have mails soon expire: |r"]
 		for k, t in pairs(DeadlineList) do
 			if k ~= "__count" then
-				alertText = alertText.."\[".. k .. "\]: "
+				alertText = alertText.."\r\n\[".. k .. "\]: "
 				for i, v in pairs(t) do
 					alertText = alertText .. v
 				end
 			end
 		end
-		alertText = alertText .. L["|cffaa0000Please remember to check it!|r"]
 		print(alertText)
 	end
 end
 
 function MB:HookSendMail(recipient, subject, body)
+	--print("HookSendMail"..SendMailNameEditBox:GetText())
+	if not recipient then recipient = SendMailNameEditBox:GetText() end
 	if not recipient then return end
+	recipient = string.upper(string.sub(recipient, 1, 1))..string.sub(recipient, 2, -1)
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			if recipient..'-'..GetRealmName() == k then
 				local Getmoney = GetSendMailMoney()
-				local Sendmoney
+				local Sendmoney, Codmoney = 0, 0
 				if Getmoney then
 					if SendMailSendMoneyButton:GetChecked() then
 						Sendmoney = Getmoney
 						MB_DB[recipient..'-'..GetRealmName()].money = MB_DB[recipient..'-'..GetRealmName()].money + Sendmoney
 					else
-						
+						Codmoney = Getmoney
 					end
 				end
 				local firstItem = true
@@ -1174,9 +1236,10 @@ function MB:HookSendMail(recipient, subject, body)
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
 						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						self:AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, Sendmoney, 0, nil, k, firstItem)
+						--AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, money, CODAmount, wasReturned, recipient, firstItem)
+						self:AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, Sendmoney, Codmoney, nil, k, firstItem)
+						firstItem = false
 					end
-					firstItem = false
 				end
 				if self:IsVisible() and selectChar == k then
 					self:Update("sort")
