@@ -242,7 +242,7 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 	if method == "money" then
 		if keyword then
 			tinsert(subIdxTb[subIdx], mailIndex)
-			print("done!")
+			--print("done!")
 		end
 		return
 	end
@@ -250,7 +250,7 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 	local itemID = tonumber(match(MB_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
 	local itemIdxTb = {mailIndex = mailIndex,attachIndex = attachIndex}
 	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
-		subIdxTb[subIdx][1] = {["itemID"] = itemID}--,["count"] = 1}
+		subIdxTb[subIdx][1] = {itemID = itemID}--,["count"] = 1}
 		subIdxTb[subIdx][1][1] = itemIdxTb
 		subIdxTb[subIdx].itemslotCount = 1
 		return
@@ -383,6 +383,7 @@ function MB:SubFilter(i, c)
 			end
 		end
 	end
+	return c
 end
 
 function MB:Filter()
@@ -397,18 +398,17 @@ function MB:Filter()
 	if method == "money" then
 		for i = 1, getn(subIdxTb[1]) do
 			c = c + 1
-			print(subIdxTb[1][i])
 			slotDB[c] = subIdxTb[1][i]
 		end
 		return
 	end
 	if filter == "__all" then
 		for i = 1, getn(subIdxTb) do
-			self:SubFilter(i, c)
+			c = self:SubFilter(i, c)
 		end
 	else
 		i = revSubIdxTb[filter]
-		self:SubFilter(i, c)
+		c = self:SubFilter(i, c)
 	end
 end
 
@@ -438,55 +438,6 @@ function MB:SortDB()
 		f:FilterMenuInitialize(self, f)
 	end)
 	self:Filter()
-end
-
-function MB:InsertToSlot(slot, slotdb, isInit, isMoney)
-	local mailIndex, attachIndex
-	if isMoney then
-		mailIndex = slotdb
-	else
-		mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
-	end
-	
-	if not mailIndex then return end
-	if isInit then
-		if not isMoney then
-			slot.link = MB_DB[selectChar][mailIndex][attachIndex].itemLink ----wrong!!?
-		else
-			slot.link = nil
-		end
-		slot.checkMailTick = MB_DB[selectChar].checkMailTick
-		slot.sender = {}
-		slot.dayLeft = {}
-		slot.countNum = {}
-		slot.wasReturned = nil
-		slot.CODAmount = nil
-		slot.mailIndex = nil
-		slot.attachIndex = nil
-		-- slot.wasReturned = {}
-		-- slot.CODAmount = {}
-		if not MB_config.isStacked then
-			slot.wasReturned = MB_DB[selectChar][mailIndex].wasReturned
-			slot.CODAmount = MB_DB[selectChar][mailIndex].CODAmount
-		end
-	end
-	if selectChar == playername then
-		if not slot.mailIndex then slot.mailIndex = {} end
-		tinsert(slot.mailIndex , mailIndex)
-		if not isMoney then
-			if not slot.attachIndex then slot.attachIndex = {} end
-			tinsert(slot.attachIndex , attachIndex)
-		end
-	end
-	tinsert(slot.sender , MB_DB[selectChar][mailIndex].sender)
-	tinsert(slot.dayLeft , MB_DB[selectChar][mailIndex].daysLeft)
-	if not isMoney then
-		tinsert(slot.countNum , MB_DB[selectChar][mailIndex][attachIndex].count)
-	end
-	-- local index = getn(slot.dayLeft)
-	-- tinsert(slot.wasReturned, index, MB_DB[selectChar][itemIndexCount].wasReturned)
-	-- tinsert(slot.CODAmount, index, MB_DB[selectChar][itemIndexCount].CODAmount)
-	return slot
 end
 
 function MB:UpdateContainer()
@@ -552,16 +503,16 @@ slotDB{		[1]		.mailIndex
 		if method == "money" then
 			local mailIndex = slotDB[itemIndex]
 			slot.mailIndex = mailIndex
-			slot = self:InsertToSlot(slot, slotDB[itemIndex], true, true)
+			--slot = self:InsertToSlot(slot, slotDB[itemIndex], true, true)
 			local money = MB_DB[selectChar][mailIndex].money
 			slot.tex:SetTexture(GetCoinIcon(money))
-			
+			slot.count:SetText(money/10000)
 		else
 			slot.mailIndex = {}
 			slot.attachIndex = {}
-			for i = 1, getn(slotDB[itemIndex]) do
-				tinsert(slot.mailIndex, slotDB[itemIndex][i].mailIndex)
-				tinsert(slot.attachIndex, slotDB[itemIndex][i].attachIndex)
+			for j = 1, getn(slotDB[itemIndex]) do
+				tinsert(slot.mailIndex, slotDB[itemIndex][j].mailIndex)
+				tinsert(slot.attachIndex, slotDB[itemIndex][j].attachIndex)
 			end
 			--local mailIndex, attachIndex = slotDB[itemIndex].mailIndex, slotDB[itemIndex].attachIndex--!!!!
 			slot.data = slotDB[itemIndex]
@@ -581,9 +532,9 @@ slotDB{		[1]		.mailIndex
 			end
 			
 			local countnum = 0
-			for i = 1 , getn(slot.mailIndex) do
-				countnum = countnum + MB_DB[selectChar][slot.mailIndex[i]][slot.attachIndex[i]].count
-				if MB_DB[selectChar][slot.mailIndex[i]].CODAmount then
+			for j = 1 , getn(slot.mailIndex) do
+				countnum = countnum + MB_DB[selectChar][slot.mailIndex[j]][slot.attachIndex[j]].count
+				if MB_DB[selectChar][slot.mailIndex[j]].CODAmount then
 				slot.tex:SetDesaturated(1)
 				slot.cod:Show()
 				end
@@ -1088,13 +1039,40 @@ slotDB{		[1]		.mailIndex
 							.money?
 							.daysLeft!
 ]]
+function MB:GetLeftTimeText(mailIndex)
+	local lefttext = L["+ Left time: "]
+	local dayLeftTick = difftime(floor(MB_DB[selectChar][mailIndex].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
+	local leftday = floor(dayLeftTick / 86400)
+	if leftday > 0 then
+		lefttext = lefttext..format("> %d "..DAYS,leftday)
+	else
+		local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
+		local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
+		lefttext = lefttext..format( lefthour > 0 and "%d"..HOURS or "" ,lefthour)..format( leftminute > 0 and "%d"..MINUTES or "",leftminute)
+	end
+	return lefttext, leftday
+end
+
 function MB:TooltipShow(self)--self=slot
 	local f = self:GetParent():GetParent()
 	local mIdx, aIdx = self.mailIndex, self.attachIndex
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	--local sender, wasReturned
 	if method =="money" then
-		local money = MB_DB[selectChar][mIdx].money ---should have
+					local x = self:GetRight();
+			if ( x >= ( GetScreenWidth() / 2 ) ) then
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+			else
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			end
+		local money = MB_DB[selectChar][mIdx].money
+		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
+		local rL, gL, bL = 1, 1, 1
+		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
+		local lefttext = f:GetLeftTimeText(mIdx)
+		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
+		GameTooltip:Show()
+		return
 	else
 		if self and self.link then
 			local x = self:GetRight();
@@ -1120,16 +1098,17 @@ function MB:TooltipShow(self)--self=slot
 			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 		end
 		
-		local lefttext = L["+ Left time: "]
-		local dayLeftTick = difftime(floor(MB_DB[selectChar][mIdx[i]].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
-		local leftday = floor(dayLeftTick / 86400)
-		if leftday > 0 then
-			lefttext = lefttext..format("> %d "..DAYS,leftday)
-		else
-			local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
-			local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-			lefttext = lefttext..format( lefthour > 0 and "%d"..HOURS or "" ,lefthour)..format( leftminute > 0 and "%d"..MINUTES or "",leftminute)--tostring(lefthour)..HOURS..tostring(leftminute)..MINUTES
-		end
+		local lefttext, leftday = f:GetLeftTimeText(mIdx[i])
+		-- local lefttext = L["+ Left time: "]
+		-- local dayLeftTick = difftime(floor(MB_DB[selectChar][mIdx[i]].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
+		-- local leftday = floor(dayLeftTick / 86400)
+		-- if leftday > 0 then
+			-- lefttext = lefttext..format("> %d "..DAYS,leftday)
+		-- else
+			-- local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
+			-- local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
+			-- lefttext = lefttext..format( lefthour > 0 and "%d"..HOURS or "" ,lefthour)..format( leftminute > 0 and "%d"..MINUTES or "",leftminute)--tostring(lefthour)..HOURS..tostring(leftminute)..MINUTES
+		-- end
 		
 		local foundSameLefttime = false
 		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
@@ -1148,19 +1127,19 @@ function MB:TooltipShow(self)--self=slot
 			formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
 			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 			
-			if MB_DB[selectChar][mIdx[i]][aIdx[i]].CODAmount then
+			if MB_DB[selectChar][mIdx[i]].CODAmount then
 				row = {}
-				row.lefttext = COD.." "..ITEMS
+				row.lefttext = "└-"..COD.." "..ITEMS
 				row.righttext = L["pay for: "]..GetCoinTextureString(MB_DB[selectChar][mIdx[i]].CODAmount)
 				row.cod = true
 				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 				--GameTooltip:AddDoubleLine(COD.." "..ITEMS, L["pay for: "]..GetCoinTextureString(self.CODAmount), 1, 0, 0.5)
 			end
 			
-			if MB_DB[selectChar][mIdx[i]][aIdx[i]].wasReturned then
+			if MB_DB[selectChar][mIdx[i]].wasReturned then
 				row = {}
-				row.lefttext = ""
-				row.righttext = L["was returned"]
+				row.lefttext = "└-"..L["was returned"]
+				row.righttext = ""
 				row.wasreturned = true
 				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 				--GameTooltip:AddLine(L["was returned"])
@@ -1185,7 +1164,7 @@ function MB:TooltipShow(self)--self=slot
 				elseif formatList[k][i].cod then
 					rL, gL, bL = 1, 0, 0.5
 				elseif formatList[k][i].wasreturned then
-				
+					rL, gL, bL = 1, 1, 1
 				end
 			end
 			GameTooltip:AddDoubleLine(formatList[k][i].lefttext, formatList[k][i].righttext, rL, gL, bL)
@@ -1227,20 +1206,20 @@ function MB:SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:Hide();
 		end
 	elseif button == 'LeftButton' and not MB_config.isStacked then
-		if self.CODAmount then
-			if self.CODAmount > GetMoney() then
+		if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
+			if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
 				SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
 				StaticPopup_Show("COD_ALERT");
 			else
-				codMoney, codMailIndex, codAttachmentIndex = self.CODAmount, self.mailIndex[1], self.attachIndex[1]
+				codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
 				SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
 				StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
 			end
 		else
-			if self.mailIndex and self.attachIndex then
-				for i = getn(self.mailIndex), 1, -1 do
+			if self.mailIndex[1] and self.attachIndex[1] then
+				--for i = getn(self.mailIndex), 1, -1 do
 					TakeInboxItem(self.mailIndex[i], self.attachIndex[i])
-				end
+				--end
 				MB:Update("sort")
 			end
 		end
