@@ -3,7 +3,7 @@ if L then
 	L["MailboxBank"] = "郵箱銀行"
 	L["UNKNOWN SENDER"] = "\[未知發件人\]"
 	L["Stack items"] = "堆疊物品"
-	L["normal"] = "普通"
+	L["No sorting"] = "不排序"
 	L["AH"] = "拍賣行"
 	L["sender"] = "發件人"
 	--L["quality"] = "品質"

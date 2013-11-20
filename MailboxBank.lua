@@ -28,8 +28,8 @@ MB.config_const = {
 	buttonSize = 36,
 	buttonSpacing = 4,
 	numItemsPerRow = 8,
-	numItemsRows = 5,
-	itemsSlotDisplay = 40,
+	numItemsRows = 10,
+	itemsSlotDisplay = 80,
 	frameWidth = 360,
 	frameHeight = 580,
 	rowcount = 8,
@@ -239,10 +239,13 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 		 self:UpdateRevIndexTable(keyword, method)
 	end
 	local subIdx = revSubIdxTb[keyword]
-	if method == "money" then
+	if method == "no-sorting" then
+		local itemIdxTb = {[1]={mailIndex = mailIndex,attachIndex = attachIndex}}
+		tinsert(subIdxTb[subIdx], itemIdxTb)
+		return
+	elseif method == "money" then
 		if keyword then
 			tinsert(subIdxTb[subIdx], mailIndex)
-			--print("done!")
 		end
 		return
 	end
@@ -284,11 +287,15 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 end
 
 MB.SelectSortMethod = {
+	["No sorting"] = function(self, mailIndex, attachIndex)
+		local keyword = L["No sorting"]
+		self:InsertToIndexTable(keyword, mailIndex, attachIndex, "no-sorting")	
+	end,
 	["AH"] = function(self, mailIndex, attachIndex)
 		if not self.AhSortIndex then self:BuildSortOrder() end
 		local itemID = tonumber(match(MB_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
 		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
-		self:InsertToIndexTable(itemSubType, mailIndex, attachIndex, "AH")	
+		self:InsertToIndexTable(itemSubType, mailIndex, attachIndex, "AH")
 	end,
 	["sender"] = function(self, mailIndex, attachIndex)
 		local sender = MB_DB[selectChar][mailIndex].sender
@@ -305,16 +312,16 @@ MB.SelectSortMethod = {
 	["C.O.D."] = function(self, mailIndex, attachIndex)
 		local isCOD
 		if MB_DB[selectChar][mailIndex].CODAmount then
-			isCOD = "is C.O.D."
+			isCOD = L["is C.O.D."]
 		else
-			isCOD = "not C.O.D."
+			isCOD = L["not C.O.D."]
 		end
 		self:InsertToIndexTable(isCOD, mailIndex, attachIndex)
 	end,
 	["money"] = function(self, mailIndex)
 		local hasMoney
 		if MB_DB[selectChar][mailIndex].money then
-			hasMoney = "has money"
+			hasMoney = L["has money"]
 		end
 		self:InsertToIndexTable(hasMoney, mailIndex, nil, "money")
 	end,
@@ -636,7 +643,7 @@ function MB:SortMenuInitialize(self, f)
 			UIDropDownMenu_AddButton(info, level)
 	end
 	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
-		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "left day");
+		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "No sorting");
 	end
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
@@ -1218,7 +1225,7 @@ function MB:SlotClick(self,button)----self=slot
 		else
 			if self.mailIndex[1] and self.attachIndex[1] then
 				--for i = getn(self.mailIndex), 1, -1 do
-					TakeInboxItem(self.mailIndex[i], self.attachIndex[i])
+					TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
 				--end
 				MB:Update("sort")
 			end
