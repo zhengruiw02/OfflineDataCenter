@@ -10,6 +10,7 @@
 --@@ TODO: optimize & combine same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
 --local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank")
 local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
+local AT = LibStub("AceTimer-3.0")--:NewAddon("MailboxBank", "AceTimer-3.0")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
@@ -1311,6 +1312,10 @@ function MB:HookSendMail(recipient, subject, body)
 	end
 end
 
+function MB:BagUpdateDelayed()
+	self:CheckBags()
+end
+
 function MB:FrameShow()
 	self:UpdateContainer()
 	self:Show()
@@ -1330,23 +1335,19 @@ local function MailboxBank_OnEvent(self, event)
 		if selectChar == playername then
 			self:Update("sort")
 		end
-	end
-	if event == "BAG_UPDATE_DELAYED" then
-		self:CheckBags()
-	end
-	if event == "BANKFRAME_OPENED" then
+	elseif event == "BAG_UPDATE_DELAYED" then
+		AT:CancelAllTimers()
+		AT:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
+	elseif event == "BANKFRAME_OPENED" then
 		self.isBankOpened = true
 		self:CheckBags()
-	end
-	if event == "BANKFRAME_CLOSED" then
+	elseif event == "BANKFRAME_CLOSED" then
 		self.isBankOpened = nil
-	end
-	if event == "MAIL_SHOW" then
+	elseif event == "MAIL_SHOW" then
 		if not self:IsVisible() then 
 			self:FrameShow();
 		end
-	end
-	if event == "MAIL_CLOSED" then
+	elseif event == "MAIL_CLOSED" then
 		self:FrameHide()
 	end
 	-- if event == "ADDON_LOADED" then
