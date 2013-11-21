@@ -3,8 +3,8 @@
 ## Title: Mailbox Bank
 ## Title-zhCN: 邮箱银行
 ## Title-zhTW: 郵箱銀行
-## Version: alpha 27
-## SavedVariables: MB_DB, MB_config
+## Version: alpha 28
+## SavedVariables: MB_DB, BB_DB, MB_config
 
 Libs\LibStub\LibStub.lua
 Libs\AceLocale-3.0\AceLocale-3.0.xml

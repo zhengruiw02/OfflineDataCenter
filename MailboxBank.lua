@@ -41,33 +41,43 @@ MB.config_init = {
 	isStacked = false,
 }
 
-function MB:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, money, CODAmount, wasReturned, recipient, firstItem)
-	local reciever
-	if recipient then
-		reciever = recipient
-		if firstItem == true then
-			local t ={}
-			tinsert(MB_DB[reciever], 1, t)
-		end
-	else
-		reciever = playername
+function MB:AddItemBag(itemLink, count, bagID, slotID)
+	if not BB_DB[playername][bagID] then
+		BB_DB[playername][bagID] = {}
+	end
+	BB_DB[playername][bagID][slotID] = {count = count, itemLink = itemLink}
+end
+--[[
+BB_DB structure:
+				bagID		slotID
+[charName] = {	[1]			[1]			{	.count
+				[n]			.slotMAX		.itemLink
+				.bagCount?
+				.itemCount
+]]
+function MB:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
+	if recipient and firstItem then
+		local t ={}
+		tinsert(MB_DB[recipient], 1, t)
+	elseif not recipient then
+		recipient = playername
 	end
 	
-	if not MB_DB[reciever][mailIndex] or firstItem then
-		MB_DB[reciever][mailIndex] = {}
-		MB_DB[reciever][mailIndex].sender = sender
-		MB_DB[reciever][mailIndex].daysLeft = daysLeft
-		MB_DB[reciever][mailIndex].wasReturned = wasReturned
-		if money > 0 then MB_DB[reciever][mailIndex].money = money end
-		if CODAmount > 0 then MB_DB[reciever][mailIndex].CODAmount = CODAmount end
-		MB_DB[reciever].mailCount = MB_DB[reciever].mailCount + 1
+	if not MB_DB[recipient][mailIndex] or firstItem then
+		MB_DB[recipient][mailIndex] = {
+			sender = sender,
+			daysLeft = daysLeft,
+			wasReturned = wasReturned,
+			money = (money > 0) and money or nil,
+			CODAmount = (CODAmount > 0) and CODAmount or nil,}
+		MB_DB[recipient].mailCount = MB_DB[recipient].mailCount + 1
 	end
 	
-	if not itemLink then return end
-	MB_DB[reciever][mailIndex][attachIndex] = {}
-	MB_DB[reciever][mailIndex][attachIndex].count = count
-	MB_DB[reciever][mailIndex][attachIndex].itemLink = itemLink
-	MB_DB[reciever].itemCount = MB_DB[reciever].itemCount + 1
+	if not itemLink then return end --for money only
+	MB_DB[recipient][mailIndex][attachIndex] = {
+		count = count,
+		itemLink = itemLink,}
+	MB_DB[recipient].itemCount = MB_DB[recipient].itemCount + 1
 end
 --[[
 new structure:
@@ -94,8 +104,11 @@ old:
 [charName] = {	[1]		{	.sender .count .itemLink .daysLeft .mailIndex
 							.attachIndex .wasReturned .CODAmount?
 ]]
-function MB:CheckMail(isCollectMoney)
-	if isCollectMoney and MB_DB[playername].money == 0 then return end
+function MB:CheckBags()
+	BB_DB[playername] = {bagCount = 0, itemCount = 0, money = 0}
+end
+
+function MB:CheckMail()
 	MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0}
 	local numItems, totalItems = GetInboxNumItems()
 	if numItems and numItems > 0 then
@@ -104,12 +117,10 @@ function MB:CheckMail(isCollectMoney)
 			local _, _, sender, _, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, _, _, _ = GetInboxHeaderInfo(mailIndex);
 			--if isGM ~= nil then print("GM@"..sender) end
 			if money > 0 then
-				if isCollectMoney then
-					TakeInboxMoney(mailIndex)
-				else
-					MB_DB[playername].money = MB_DB[playername].money + money
-				end
+				MB_DB[playername].money = MB_DB[playername].money + money
 			end
+			--self:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
+			self:AddItemMail(nil, nil, mailIndex, nil, sender, daysLeft, money, CODAmount, wasReturned)
 			if hasItem then
 				if sender == nil then
 					sender = L["UNKNOWN SENDER"]
@@ -118,12 +129,9 @@ function MB:CheckMail(isCollectMoney)
 					local itemLink = GetInboxItemLink(mailIndex, attachIndex)
 					if itemLink then
 						local _, _, count, _, _ = GetInboxItem(mailIndex, attachIndex)
-						self:AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, money, CODAmount, wasReturned)
+						self:AddItemMail(itemLink, count, mailIndex, attachIndex)
 					end
 				end
-			elseif money > 0 then
-				self:AddItem(sender, nil, nil, daysLeft, mailIndex, nil, money, CODAmount, wasReturned)
-			
 			end
 		end
 	end
@@ -166,10 +174,6 @@ function MB:SearchBarResetAndClear()
 	self.searchingBarText:Show();
 	self.searchingBar:ClearFocus();
 	self.searchingBar:SetText("");
-end
-
-function MB:CollectMoney()
-	self:CheckMail(true)
 end
 
 ---- Sorting ----
@@ -419,7 +423,7 @@ function MB:Filter()
 	end
 end
 
-function MB:SortDB()
+function MB:SortDB(isBag)
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	if not method then return end
 	subIdxTb = {}
@@ -574,7 +578,6 @@ function MB:Update(isSortDB)
 	elseif isSortDB == "filter" then
 		self:Filter()
 	end
-	
 	self:UpdateContainer()
 end
 
@@ -618,7 +621,6 @@ function MB:FilterMenuInitialize(self, f)
 		UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
 		selectSortChanged = nil
 	end
-	--UIDropDownMenu_SetSelectedValue(MailboxBankFrameFilterDropDown, "__all");
 end
 
 function MB:SortMethod_OnClick(self, f)
@@ -807,13 +809,6 @@ function MB:CreateMailboxBankFrame()
 	f.filter:SetPoint("LEFT", f.sortmethod, 150, 0)
 	--UIDropDownMenu_Initialize(f.filter, f:FilterMenuInitialize);
 	
-	----Create collect mailbox gold button
-	--[[f.CollectGoldButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate");
-	f.CollectGoldButton:SetWidth(100)
-	f.CollectGoldButton:SetHeight(30)
-	f.CollectGoldButton:SetPoint("BOTTOMLEFT", 10, 5);
-	f.CollectGoldButton:SetText(L["Collect gold"])]]
-	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
 	if E then
@@ -958,10 +953,6 @@ function MB:CreateMailboxBankFrame()
 	f.scrollBar:SetScript("OnShow", function()
 		f:Update()
 	end)
-	
---[[	f.CollectGoldButton:SetScript("OnClick", function()
-		f:CollectMoney()
-	end)]]
 	
 	UIDropDownMenu_Initialize(f.chooseChar, function(self)
 		f:ChooseCharMenuInitialize(self, f)
@@ -1234,7 +1225,7 @@ function MB:SlotClick(self,button)----self=slot
 end
 
 function MB:AlertDeadlineMails()
-	local DeadlineList = {["__count"] = 0}
+	local DeadlineList = {__count = 0}
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 		--.mailCount .itemCount
@@ -1250,8 +1241,8 @@ function MB:AlertDeadlineMails()
 							tinsert(DeadlineList[k], u.itemLink)
 						end
 					end
-				else
-					break
+				--else--because of cod items' deadline is 3 days !!
+					--break
 				end
 			end
 		end
@@ -1271,7 +1262,6 @@ function MB:AlertDeadlineMails()
 end
 
 function MB:HookSendMail(recipient, subject, body)
-	--print("HookSendMail"..SendMailNameEditBox:GetText())
 	if not recipient then recipient = SendMailNameEditBox:GetText() end
 	if not recipient then return end
 	recipient = string.upper(string.sub(recipient, 1, 1))..string.sub(recipient, 2, -1)
@@ -1293,9 +1283,9 @@ function MB:HookSendMail(recipient, subject, body)
 					local Name, _, count, _ = GetSendMailItem(i)
 					if Name then
 						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						--AddItem(sender, itemLink, count, daysLeft, mailIndex, attachIndex, money, CODAmount, wasReturned, recipient, firstItem)
-						self:AddItem(GetUnitName("player"), itemLink, count, 31, 1, i, Sendmoney, Codmoney, nil, k, firstItem)
-						firstItem = false
+						--self:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
+						self:AddItemMail(itemLink, count, 1, i, GetUnitName("player"), 31, Sendmoney, Codmoney, nil, k, firstItem)
+						firstItem = nil
 					end
 				end
 				if self:IsVisible() and selectChar == k then
@@ -1350,6 +1340,7 @@ local function MailboxBank_OnEvent(self, event)
 			end
 		end]]
 		if not MB_DB then MB_DB = {} end
+		if not BB_DB then BB_DB = {} end
 		self:CreateMailboxBankFrame()
 		self:AlertDeadlineMails()
 		hooksecurefunc("SendMail", function() self:HookSendMail() end)
