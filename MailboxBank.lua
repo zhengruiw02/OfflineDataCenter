@@ -52,8 +52,8 @@ BB_DB structure:
 				bagID		slotID
 [charName] = {	[1]			[1]			{	.count
 				[n]			.slotMAX		.itemLink
-				.bagCount?
-				.itemCount
+				.itemCountBank
+				.itemCountBag
 ]]
 function MB:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
 	if recipient and firstItem then
@@ -96,16 +96,32 @@ for i = 1, getn(mailIndex) do
 		end
 	end
 end
-
 get position(sortDB, filter, updateContainer):
 from i, j (mailIndex, attachIndex)
-
-old:
-[charName] = {	[1]		{	.sender .count .itemLink .daysLeft .mailIndex
-							.attachIndex .wasReturned .CODAmount?
 ]]
+--MB.BagIDs = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+
 function MB:CheckBags()
-	BB_DB[playername] = {bagCount = 0, itemCount = 0, money = 0}
+	if not BB_DB[playername] then BB_DB[playername] = {} end
+	local BagIDs = self.isBankOpened and {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} or {0, 1, 2, 3, 4}
+	local numSlots, full = GetNumBankSlots();
+	--BB_DB[playername].money = GetMoney()
+	for k, bagID in pairs(BagIDs) do
+		local numSlots = GetContainerNumSlots(bagID)
+		if numSlots > 0 then
+			BB_DB[playername][bagID] = {slotMAX = numSlots}
+			local inbagItemCount = 0
+			for slotIndex = 1, numSlots do
+				local itemLink = GetContainerItemLink(bagID, slotIndex)
+				if itemLink then
+					local _, count, _, _, _ = GetContainerItemInfo(bagID, slotIndex)
+					self:AddItemBag(itemLink, count, bagID, slotIndex)
+					inbagItemCount = inbagItemCount + 1
+				end
+			end
+			BB_DB[playername][bagID].inbagItemCount = inbagItemCount
+		end
+	end
 end
 
 function MB:CheckMail()
@@ -180,13 +196,13 @@ end
 
 function MB:BuildSortOrder()
 	self.AhSortIndex = {}
-	local c = 0;
+	--local c = 0;
 	for i, iType in ipairs({GetAuctionItemClasses()}) do
 		self.AhSortIndex[iType] = i
-		for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			c = c + 1;
-			self.AhSortIndex[isType] = c;
-		end
+		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
+			-- c = c + 1;
+			-- self.AhSortIndex[isType] = c;
+		-- end
 	end
 end
 
@@ -298,21 +314,21 @@ MB.SelectSortMethod = {
 	["AH"] = function(self, mailIndex, attachIndex)
 		if not self.AhSortIndex then self:BuildSortOrder() end
 		local itemID = tonumber(match(MB_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
-		local _, _, itemRarity, _, _, _, itemSubType, _, _, _, _ = GetItemInfo(itemID)
-		self:InsertToIndexTable(itemSubType, mailIndex, attachIndex, "AH")
-	end,
-	["sender"] = function(self, mailIndex, attachIndex)
-		local sender = MB_DB[selectChar][mailIndex].sender
-		self:InsertToIndexTable(sender, mailIndex, attachIndex)	
+		local _, _, itemRarity, _, _, itemType, _, _, _, _, _ = GetItemInfo(itemID)
+		self:InsertToIndexTable(itemType, mailIndex, attachIndex, "AH")
 	end,
 	["quality"] = function(self, mailIndex, attachIndex)
 		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(MB_DB[selectChar][mailIndex][attachIndex].itemLink)
 		self:InsertToIndexTable(quality, mailIndex, attachIndex, "quality")
 	end,
+	["sender"] = function(self, mailIndex, attachIndex)
+		local sender = MB_DB[selectChar][mailIndex].sender
+		self:InsertToIndexTable(sender, mailIndex, attachIndex)	
+	end,--mailbox only
 	["left day"] = function(self, mailIndex, attachIndex)
 		local leftday = self:CalcLeftDay(selectChar, mailIndex)
 		self:InsertToIndexTable(leftday, mailIndex, attachIndex, "left day")
-	end,
+	end,--mailbox only
 	["C.O.D."] = function(self, mailIndex, attachIndex)
 		local isCOD
 		if MB_DB[selectChar][mailIndex].CODAmount then
@@ -321,14 +337,14 @@ MB.SelectSortMethod = {
 			isCOD = L["not C.O.D."]
 		end
 		self:InsertToIndexTable(isCOD, mailIndex, attachIndex)
-	end,
+	end,--mailbox only
 	["money"] = function(self, mailIndex)
 		local hasMoney
 		if MB_DB[selectChar][mailIndex].money then
 			hasMoney = L["has money"]
 		end
 		self:InsertToIndexTable(hasMoney, mailIndex, nil, "money")
-	end,
+	end,--mailbox only
 }
 
 --[[ subIdxTb structure
@@ -481,12 +497,9 @@ function MB:UpdateContainer()
 	
 --[[
 structure of slotDB:
-case1: isStack
+case1&2: isStack = not stack
 slotDB{		[1]		{	[1].mailIndex .attachIndex
 			[2]			[2].mailIndex .attachIndex
-case2: not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]		{	[1].mailIndex .attachIndex
 case3: money only
 slotDB{		[1]		.mailIndex
 			[2]
@@ -634,6 +647,7 @@ function MB:SortMethod_OnClick(self, f)
 end
 
 function MB:SortMenuInitialize(self, f)
+--TODO: split out Methods from bags
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(f.SelectSortMethod) do
 			info = UIDropDownMenu_CreateInfo()
@@ -1317,6 +1331,16 @@ local function MailboxBank_OnEvent(self, event)
 			self:Update("sort")
 		end
 	end
+	if event == "BAG_UPDATE_DELAYED" then
+		self:CheckBags()
+	end
+	if event == "BANKFRAME_OPENED" then
+		self.isBankOpened = true
+		self:CheckBags()
+	end
+	if event == "BANKFRAME_CLOSED" then
+		self.isBankOpened = nil
+	end
 	if event == "MAIL_SHOW" then
 		if not self:IsVisible() then 
 			self:FrameShow();
@@ -1330,6 +1354,9 @@ local function MailboxBank_OnEvent(self, event)
 	-- end
 	if event == "PLAYER_ENTERING_WORLD" then
 		self:RegisterEvent("MAIL_INBOX_UPDATE")
+		self:RegisterEvent("BAG_UPDATE_DELAYED")
+		self:RegisterEvent("BANKFRAME_OPENED")
+		self:RegisterEvent("BANKFRAME_CLOSED")
 		self:RegisterEvent("MAIL_SHOW")
 		self:RegisterEvent("MAIL_CLOSED")
 		if MB_config == nil then MB_config = {} end
@@ -1344,6 +1371,8 @@ local function MailboxBank_OnEvent(self, event)
 		self:CreateMailboxBankFrame()
 		self:AlertDeadlineMails()
 		hooksecurefunc("SendMail", function() self:HookSendMail() end)
+		self.isBankOpened = nil
+		--hooksecurefunc("CloseBankFrame", function() self:HookCloseBankFrame() end)
 		self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	end
 end

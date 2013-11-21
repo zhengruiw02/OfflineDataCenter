@@ -13,6 +13,8 @@ if L then
 	L["C.O.D."] = COD
 	L["money"] = MONEY
 	L["has money"] = "拥有钱"
+	L["is C.O.D."] = "付费取件"
+	L["not C.O.D."] = "非付费取件"
 	L["Collect gold"] = "收取金币"
 	L["Sender: "]  = "发件人: "
 	L["+ Left time: "] = "+ 剩余 "
