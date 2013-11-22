@@ -29,4 +29,8 @@ if L then
 	L["Mailbox gold: "] = "郵箱金幣: "
 	L[": |cff00aabbYou have mails soon expire: |r"] = ": |cffaa0000您的郵箱有快到期的附件: |r"
 	--L[""] = ""
+	
+	L['Offline MailBox'] = '離線郵箱';
+	L['Offline Bag'] = '離線背包';
+	L['Offline Bank'] = '離線銀行';	
 end

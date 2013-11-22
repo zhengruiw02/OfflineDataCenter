@@ -19,8 +19,13 @@ local selectChar = playername
 local slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
-
+local Textures = {
+	["bag"] = "Interface\\AddOns\\MailboxBank\\Textures\\bag.tga", 
+	["bank"] = "Interface\\AddOns\\MailboxBank\\Textures\\bank.tga", 
+	["mail"] = "Interface\\AddOns\\MailboxBank\\Textures\\mailbox.tga",
+}
 local MB = CreateFrame("Frame", nil , UIParent)
+local G_DB
 
 MB.config_const = {
 	daysLeftYellow = 7,
@@ -700,14 +705,26 @@ function MB:ChooseCharMenuInitialize(self, f)
 	f.chooseChar:SetWidth(width+60)
 end
 
-
+function MB:SetActiveTab(typeStr)
+	if typeStr == 'mail' then
+		G_DB = MB_DB
+	else
+		G_DB = BB_DB
+	end
+	--重新初始化各下拉选项框
+	--根据新的DB刷新SLOT
+	
+	MB:Update("sort")
+	MB:FrameShow()
+end
+	
 function MB:CreateMailboxBankFrame()
 	----Create mailbox bank frame
-	local E
-	if ElvUI then E = unpack(ElvUI) end
+
 	local f = self
-	if E then
-		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
+		
+	if ElvUI then
+		f:SetTemplate(ElvUI[1].db.bags.transparent and "notrans" or "Transparent")
 	else
 		f:SetBackdrop({
 			bgFile = [[Interface\DialogFrame\UI-DialogBox-Background]],
@@ -736,7 +753,7 @@ function MB:CreateMailboxBankFrame()
 		
 	----Create headline
 	f.headline = f:CreateFontString(nil, 'OVERLAY');
-	if E then
+	if ElvUI then
 		f.headline:FontTemplate()
 	else
 		f.headline:SetFont(STANDARD_TEXT_FONT, 14);
@@ -759,7 +776,7 @@ function MB:CreateMailboxBankFrame()
 	end)
 	
 	----Search
-	if E then
+	if ElvUI then
 		f.searchingBar = CreateFrame('EditBox', nil, f);
 		f.searchingBar:CreateBackdrop('Default', true);
 	else
@@ -770,14 +787,14 @@ function MB:CreateMailboxBankFrame()
 	f.searchingBar:SetWidth(180);
 	f.searchingBar:Hide();
 	f.searchingBar:SetPoint('BOTTOMLEFT', f.headline, 'BOTTOMLEFT', 0, -30);
-	if E then
+	if ElvUI then
 		f.searchingBar:FontTemplate()
 	else
 		f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12);
 	end
 
 	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
-	if E then
+	if ElvUI then
 		f.searchingBarText:FontTemplate()
 	else	
 		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
@@ -826,7 +843,7 @@ function MB:CreateMailboxBankFrame()
 	
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
-	if E then
+	if ElvUI then
 		f.mailboxGoldText:FontTemplate()
 	else
 		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 14);
@@ -855,8 +872,8 @@ function MB:CreateMailboxBankFrame()
 		f:Update()
 	end)
 	
-	if E then
-		local S = E:GetModule("Skins")
+	if ElvUI then
+		local S = ElvUI[1]:GetModule("Skins")
 		if S then
 			S:HandleCloseButton(f.closeButton);
 			S:HandleCheckBox(f.stackUpCheckButton);
@@ -892,7 +909,7 @@ function MB:CreateMailboxBankFrame()
 		
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.cod = slot:CreateFontString(nil, 'OVERLAY');
-		if E then
+		if ElvUI then
 			slot.count:FontTemplate()
 			slot.cod:FontTemplate()
 		else
@@ -976,15 +993,49 @@ function MB:CreateMailboxBankFrame()
 	UIDropDownMenu_Initialize(f.sortmethod, function(self)
 		f:SortMenuInitialize(self, f)
 	end)
+	
+	--tab button
+	local tabIndex = 1
+	for k , v in pairs(Textures) do
+		local tab = CreateFrame("CheckButton", name..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
+		tab:ClearAllPoints()
+		local texture
+		if E.Skins then
+			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
+			tabIndex = tabIndex + 1
+			tab:DisableDrawLayer("BACKGROUND")
+			tab:SetNormalTexture(v)
+			tab:GetNormalTexture():ClearAllPoints()
+			tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
+			tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
+			tab:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+			tab:CreateBackdrop("Default")
+			tab.backdrop:SetAllPoints()
+			tab:StyleButton()
+		else
+			tab:SetPoint("TOPLEFT", object, "TOPRIGHT", 0, (-44 * index) + 18)
+			tab:SetNormalTexture(v)
+		end	
+		tab:SetAttribute("type", "spell")
+		tab:SetAttribute("spell", name)
+		tab.typeStr = k
+		tab:SetScript("OnClick", function(self)
+			MB:SetActiveTab(self.typeStr)
+		end)
+		
+		tab.name = name
+		tab.tooltip = name
+		tab:Show()
+	end
 end
 
 function MB:CreatePopupFrame()
 	self.PopupFrame = CreateFrame("Frame", nil , UIParent)
 	local f = self.PopupFrame
-	local E
-	if ElvUI then E = unpack(ElvUI) end
-	if E then
-		f:SetTemplate(E.db.bags.transparent and "notrans" or "Transparent")
+
+	if ElvUI then
+		f:SetTemplate(ElvUI[1].db.bags.transparent and "notrans" or "Transparent")
 	else
 		f:SetBackdrop({
 			bgFile = [[Interface\DialogFrame\UI-DialogBox-Background]],
@@ -1327,6 +1378,118 @@ function MB:FrameHide()
 	collectgarbage("collect")
 end
 
+local MailboxBankPopMenu = {
+	{text = L['Offline MailBox'],
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('mail') end},
+	{text = L['Offline Bag'],
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bag') end},
+	{text = L['Offline Bank'], 
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bank') end},
+}
+
+local function DropDown(list, frame, xOffset, yOffset)
+	if not frame.buttons then
+		frame.buttons = {}
+		frame:SetFrameStrata("DIALOG")
+		frame:SetClampedToScreen(true)
+		tinsert(UISpecialFrames, frame:GetName())
+		frame:Hide()
+	end
+
+	xOffset = xOffset or 0
+	yOffset = yOffset or 0
+
+	for i=1, #frame.buttons do
+		frame.buttons[i]:Hide()
+	end
+
+	for i=1, #list do 
+		if not frame.buttons[i] then
+			frame.buttons[i] = CreateFrame("Button", nil, frame)
+			
+			frame.buttons[i].hoverTex = frame.buttons[i]:CreateTexture(nil, 'OVERLAY')
+			frame.buttons[i].hoverTex:SetAllPoints()
+			frame.buttons[i].hoverTex:SetTexture([[Interface\QuestFrame\UI-QuestTitleHighlight]])
+			frame.buttons[i].hoverTex:SetBlendMode("ADD")
+			frame.buttons[i].hoverTex:Hide()
+
+			frame.buttons[i].text = frame.buttons[i]:CreateFontString(nil, 'BORDER')
+			frame.buttons[i].text:SetAllPoints()
+			frame.buttons[i].text:SetFont(STANDARD_TEXT_FONT, 10, 'OUTLINE')
+			frame.buttons[i].text:SetJustifyH("LEFT")
+
+			frame.buttons[i]:SetScript("OnEnter", function(btn)
+				btn.hoverTex:Show()
+			end)
+			frame.buttons[i]:SetScript("OnLeave", function(btn)
+				btn.hoverTex:Hide()
+			end)
+		end
+
+		frame.buttons[i]:Show()
+		frame.buttons[i]:SetHeight(16)
+		frame.buttons[i]:SetWidth(135)
+		frame.buttons[i].text:SetText(list[i].text)
+		frame.buttons[i].func = list[i].func
+		frame.buttons[i]:SetScript("OnClick", function(btn)
+			btn.func()
+			btn:GetParent():Hide()
+		end)
+
+		if i == 1 then
+			frame.buttons[i]:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -10)
+		else
+			frame.buttons[i]:SetPoint("TOPLEFT", frame.buttons[i-1], "BOTTOMLEFT")
+		end
+	end
+
+	frame:SetHeight((#list * 16) + 10 * 2)
+	frame:SetWidth(135 + 10 * 2)
+
+	local UIScale = UIParent:GetScale();
+	local x, y = GetCursorPosition();
+	x = x/UIScale
+	y = y/UIScale
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x + xOffset, y + yOffset)	
+
+	ToggleFrame(frame)
+end
+
+local menuFrame = CreateFrame("Frame", "MailboxBankClickMenu", E.UIParent)
+
+function MB:CreateToggleButton(f, x, y)
+	if not f then return; end
+	
+	if _G[f:GetName().."OfflineToogleButton"] then
+		return _G[f:GetName().."OfflineToogleButton"]
+	end		
+	
+	local frame = CreateFrame("Button", f:GetName().."OfflineToogleButton", f)
+	if ElvUI then
+		frame:StyleButton()
+		frame:SetTemplate("Transparent")
+	end	
+	frame:RegisterForClicks('AnyUp', 'AnyDown')
+	frame:SetScript("OnClick", function(self)
+		DropDown(MailboxBankPopMenu, menuFrame)
+	end)
+	frame:SetSize(18, 18)
+	frame:SetNormalTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
+	frame:SetPushedTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
+	frame:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:AddLine('Offline Frame')
+		GameTooltip:SetClampedToScreen(true)
+		GameTooltip:Show()
+	end)
+	frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	frame:SetClampedToScreen(true)
+	frame:SetPoint("TOPLEFT", x or 20, y or -10)
+	
+	return frame
+end
+
 ---- Event ----
 
 local function MailboxBank_OnEvent(self, event)
@@ -1340,6 +1503,7 @@ local function MailboxBank_OnEvent(self, event)
 		AT:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
 	elseif event == "BANKFRAME_OPENED" then
 		self.isBankOpened = true
+		self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
 		self:CheckBags()
 	elseif event == "BANKFRAME_CLOSED" then
 		self.isBankOpened = nil
@@ -1370,6 +1534,13 @@ local function MailboxBank_OnEvent(self, event)
 		if not MB_DB then MB_DB = {} end
 		if not BB_DB then BB_DB = {} end
 		self:CreateMailboxBankFrame()
+		self:SetActiveTab('mail')
+		
+		self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20) end
+		self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20) end
+		self:CreateToggleButton(ContainerFrame1, 2, -2) end
+		self:CreateToggleButton(BankFrame, 2, -2) end
+		
 		self:AlertDeadlineMails()
 		hooksecurefunc("SendMail", function() self:HookSendMail() end)
 		self.isBankOpened = nil
