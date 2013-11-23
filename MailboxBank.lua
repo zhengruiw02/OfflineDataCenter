@@ -1000,7 +1000,8 @@ function MB:CreateMailboxBankFrame()
 		local tab = CreateFrame("CheckButton", name..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
 		tab:ClearAllPoints()
 		local texture
-		if E.Skins then
+		if ElvUI then
+			--local S = ElvUI[1]:GetModule("Skins")
 			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
 			tabIndex = tabIndex + 1
 			tab:DisableDrawLayer("BACKGROUND")
@@ -1014,7 +1015,7 @@ function MB:CreateMailboxBankFrame()
 			tab.backdrop:SetAllPoints()
 			tab:StyleButton()
 		else
-			tab:SetPoint("TOPLEFT", object, "TOPRIGHT", 0, (-44 * index) + 18)
+			tab:SetPoint("TOPLEFT", object, "TOPRIGHT", 0, (-44 * tabIndex) + 18)
 			tab:SetNormalTexture(v)
 		end	
 		tab:SetAttribute("type", "spell")
@@ -1456,7 +1457,7 @@ local function DropDown(list, frame, xOffset, yOffset)
 	ToggleFrame(frame)
 end
 
-local menuFrame = CreateFrame("Frame", "MailboxBankClickMenu", E.UIParent)
+local menuFrame = CreateFrame("Frame", "MailboxBankClickMenu", UIParent)
 
 function MB:CreateToggleButton(f, x, y)
 	if not f then return; end
@@ -1536,10 +1537,10 @@ local function MailboxBank_OnEvent(self, event)
 		self:CreateMailboxBankFrame()
 		self:SetActiveTab('mail')
 		
-		self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20) end
-		self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20) end
-		self:CreateToggleButton(ContainerFrame1, 2, -2) end
-		self:CreateToggleButton(BankFrame, 2, -2) end
+		self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
+		self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20)
+		self:CreateToggleButton(ContainerFrame1, 2, -2)
+		self:CreateToggleButton(BankFrame, 2, -2)
 		
 		self:AlertDeadlineMails()
 		hooksecurefunc("SendMail", function() self:HookSendMail() end)
