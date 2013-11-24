@@ -20,12 +20,12 @@ local selectTab
 local slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
-local Textures = {
-	["bag"] = "Interface\\AddOns\\MailboxBank\\Textures\\bag.tga", 
-	["bank"] = "Interface\\AddOns\\MailboxBank\\Textures\\bank.tga", 
-	["mail"] = "Interface\\AddOns\\MailboxBank\\Textures\\mailbox.tga",
+MB.TabTextures = {
+	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
+	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
+	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
 }
-local TabTooltip = {
+MB.TabTooltip = {
 	["bag"] = L['Offline Bag'], 
 	["bank"] = L['Offline Bank'], 
 	["mail"] = L['Offline MailBox'],
@@ -514,7 +514,16 @@ function MB:UpdateContainer()
 			sumQ = sumQ.."|c"..colorCode.._G["ITEM_QUALITY"..i.."_DESC"]..": "..sumQuality[i].."|r "
 		end
 	end
-	self.Frame.mailboxGoldText:SetText(L["Mailbox gold: "]..GetCoinTextureString(G_DB[selectChar].money).."\r\n"..sumQ)
+	if sumQ ~= "" then
+		sumQ = "\r\n"..sumQ
+	end
+	local former
+	if selectTab == "mail" then
+		former = L["Mailbox gold: "]
+	else
+		former = L["Character gold: "]
+	end
+	self.Frame.mailboxGoldText:SetText(former..GetCoinTextureString(G_DB[selectChar].money)..sumQ)
 	--self.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectChar].checkMailTick)/60).." 分鐘前掃描" or "");
 
 	local offset = FauxScrollFrame_GetOffset(self.Frame.scrollBar)
@@ -718,7 +727,7 @@ function MB:ChooseCharMenuInitialize(self)
 			info.text = k
 			info.value = k
 			info.func = function(self)
-				MB.Frame:ChooseChar_OnClick(self)
+				MB:ChooseChar_OnClick(self)
 			end;
 			UIDropDownMenu_AddButton(info, level)
 		end
@@ -731,6 +740,10 @@ function MB:ChooseCharMenuInitialize(self)
 end
 
 function MB:SetActiveTab(typeStr)
+	for k, v in pairs(MB.TabTooltip) do
+		_G["MailboxBankFrame"..k..'Tab']:SetChecked(false)
+	end
+	_G["MailboxBankFrame"..typeStr..'Tab']:SetChecked(true)
 	if typeStr == 'mail' then
 		G_DB = MB_DB
 	else
@@ -1021,7 +1034,7 @@ function MB:CreateMailboxBankFrame()
 	
 	--tab button
 	local tabIndex = 1
-	for k , v in pairs(Textures) do
+	for k , v in pairs(self.TabTextures) do
 		local tab = CreateFrame("CheckButton", name..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
 		tab:ClearAllPoints()
 		local texture
@@ -1051,7 +1064,7 @@ function MB:CreateMailboxBankFrame()
 		end)
 		
 		tab.name = name
-		tab.tooltip = TabTooltip[k]
+		tab.tooltip = MB.TabTooltip[k]
 		tab:Show()
 	end
 end
@@ -1144,7 +1157,18 @@ function MB:GetLeftTimeText(mailIndex)
 end
 
 function MB:TooltipShow(self)--self=slot
-	local f = self:GetParent():GetParent()
+	if selectTab ~= "mail" then 
+		if self and self.link then
+			local x = self:GetRight();
+			if ( x >= ( GetScreenWidth() / 2 ) ) then
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+			else
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			end
+			GameTooltip:SetHyperlink(self.link)
+		end
+		return
+	end
 	local mIdx, aIdx = self.mailIndex, self.attachIndex
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	--local sender, wasReturned
@@ -1159,7 +1183,7 @@ function MB:TooltipShow(self)--self=slot
 		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
 		local rL, gL, bL = 1, 1, 1
 		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
-		local lefttext = f:GetLeftTimeText(mIdx)
+		local lefttext = MB:GetLeftTimeText(mIdx)
 		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
 		GameTooltip:Show()
 		return
@@ -1173,9 +1197,6 @@ function MB:TooltipShow(self)--self=slot
 			end
 			GameTooltip:SetHyperlink(self.link)
 		end
-		
-		--local sender, countNum, dayLeft, CODAmount, wasReturned = 
-		
 	end
 	
 	local formatList = {}
@@ -1188,7 +1209,7 @@ function MB:TooltipShow(self)--self=slot
 			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 		end
 		
-		local lefttext, leftday = f:GetLeftTimeText(mIdx[i])
+		local lefttext, leftday = MB:GetLeftTimeText(mIdx[i])
 		-- local lefttext = L["+ Left time: "]
 		-- local dayLeftTick = difftime(floor(MB_DB[selectChar][mIdx[i]].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
 		-- local leftday = floor(dayLeftTick / 86400)
@@ -1244,9 +1265,9 @@ function MB:TooltipShow(self)--self=slot
 			if i > 1 then
 				if formatList[k][i].leftday then
 					local leftday = formatList[k][i].leftday
-					if leftday < f.config_const.daysLeftRed then
+					if leftday < MB.config_const.daysLeftRed then
 						rL, gL, bL = 1, 0, 0
-					elseif leftday < f.config_const.daysLeftYellow then
+					elseif leftday < MB.config_const.daysLeftYellow then
 						rL, gL, bL = 1, 1, 0
 					else
 						rL, gL, bL = 0, 1, 0
@@ -1295,7 +1316,7 @@ function MB:SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' and not MB_config.isStacked then
+	elseif button == 'LeftButton' and not MB_config.isStacked and selectTab == "mail" then
 		if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
 			if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
 				SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
