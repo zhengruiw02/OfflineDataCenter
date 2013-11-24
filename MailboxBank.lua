@@ -493,7 +493,7 @@ function MB:SortDB()
 			end
 		end
 	end
-	--if not subIdxTb then print("empty!!");return end
+	if revSubIdxTb.__count == 0 then slotDB = nil; return end
 	UIDropDownMenu_Initialize(MailboxBankFrameFilterDropDown, function(self)
 		MB:FilterMenuInitialize(self)
 	end)
@@ -702,9 +702,9 @@ function MB:SortMenuInitialize(self)
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
+	--if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
 		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "No sorting");
-	end
+	--end
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
 	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
@@ -760,7 +760,7 @@ function MB:SetActiveTab(typeStr)
 	--根据新的DB刷新SLOT
 	selectTab = typeStr
 	MB:Update("sort")
-	MB:FrameShow()
+	--MB:FrameShow()
 end
 	
 function MB:CreateMailboxBankFrame()
@@ -1551,31 +1551,31 @@ end
 ---- Event ----
 
 function MB:MAIL_INBOX_UPDATE()
-		self:CheckMail()
-		if selectChar == playername then
-			self:Update("sort")
-		end
+	self:CheckMail()
+	if selectChar == playername then
+		self:Update("sort")
+	end
 end
 
 function MB:BAG_UPDATE_DELAYED()
-		self:CancelAllTimers()
-		self:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
+	self:CancelAllTimers()
+	self:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
 end
 
 function MB:BANKFRAME_OPENED()
-		self.isBankOpened = true
-		self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
-		self:CheckBags()
+	self.isBankOpened = true
+	self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
+	self:CheckBags()
 end
 
 function MB:BANKFRAME_CLOSED()
-		self.isBankOpened = nil
+	self.isBankOpened = nil
 end
 
 function MB:MAIL_SHOW()
-		if not self.Frame:IsVisible() then 
-			self:FrameShow();
-		end
+	if not self.Frame:IsVisible() then 
+		self:FrameShow();
+	end
 end
 
 function MB:MAIL_CLOSED()
