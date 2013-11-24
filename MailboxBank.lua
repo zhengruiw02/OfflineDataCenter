@@ -33,6 +33,8 @@ MB.TabTooltip = {
 --local MB = CreateFrame("Frame", nil , UIParent)
 local G_DB
 
+MB.isMailboxOnly = false
+
 MB.config_const = {
 	daysLeftYellow = 7,
 	daysLeftRed = 3,
@@ -511,11 +513,12 @@ function MB:UpdateContainer()
 	for i = 1, 7 do
 		if sumQuality[i] then
 			local _,_,_,colorCode = GetItemQualityColor(i)
-			sumQ = sumQ.."|c"..colorCode.._G["ITEM_QUALITY"..i.."_DESC"]..": "..sumQuality[i].."|r "
+			if sumQ ~= "" then sumQ = sumQ.." / " end
+			sumQ = sumQ.."|c"..colorCode..sumQuality[i].."|r "
 		end
 	end
 	if sumQ ~= "" then
-		sumQ = "\r\n"..sumQ
+		sumQ = "\r\n"..L["Quality summary: "]..sumQ
 	end
 	local former
 	if selectTab == "mail" then
@@ -687,9 +690,9 @@ function MB:SortMethod_OnClick(self)
 end
 
 function MB:SortMenuInitialize(self)
---TODO: split out Methods from bags
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(MB.SelectSortMethod) do
+		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L[k]
 			info.value = k
@@ -697,6 +700,7 @@ function MB:SortMenuInitialize(self)
 				MB:SortMethod_OnClick(self)
 			end;
 			UIDropDownMenu_AddButton(info, level)
+		end
 	end
 	if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
 		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "No sorting");
@@ -749,6 +753,9 @@ function MB:SetActiveTab(typeStr)
 	else
 		G_DB = BB_DB
 	end
+	UIDropDownMenu_Initialize(MB.Frame.sortmethod, function(self)
+		MB:SortMenuInitialize(self)
+	end)
 	--重新初始化各下拉选项框
 	--根据新的DB刷新SLOT
 	selectTab = typeStr
@@ -1316,23 +1323,27 @@ function MB:SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' and not MB_config.isStacked and selectTab == "mail" then
-		if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
-			if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
-				SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
-				StaticPopup_Show("COD_ALERT");
+	elseif button == 'LeftButton' and not MB_config.isStacked then
+		if selectTab == "mail" then
+			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
+				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
+					SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
+					StaticPopup_Show("COD_ALERT");
+				else
+					codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
+					SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
+					StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+				end
 			else
-				codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
-				SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
-				StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+				if self.mailIndex[1] and self.attachIndex[1] then
+					--for i = getn(self.mailIndex), 1, -1 do
+						TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
+					--end
+					MB:Update("sort")
+				end
 			end
 		else
-			if self.mailIndex[1] and self.attachIndex[1] then
-				--for i = getn(self.mailIndex), 1, -1 do
-					TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
-				--end
-				MB:Update("sort")
-			end
+			
 		end
 	end
 end

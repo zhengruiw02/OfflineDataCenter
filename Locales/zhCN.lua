@@ -28,6 +28,7 @@ if L then
 	L["was returned"] = "已被退回"
 	L["Mailbox gold: "] = "邮箱金币: "
 	L["Character gold: "] = "角色金币: "
+	L["Quality summary: "] = "品质统计: "
 	L[": |cff00aabbYou have mails soon expire: |r"] = ": |cffaa0000您的邮箱有快到期的附件: |r"
 	--L[""] = ""
 	
