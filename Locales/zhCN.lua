@@ -36,4 +36,7 @@ if L then
 	L['Offline Bag'] = '离线背包';
 	L['Offline Bank'] = '离线银行';
 	L['Offline Frame'] = '离线窗口';
+	
+	L['Hold down the ALT key'] = '按住Alt键';
+	L['Show the number of items for all Character'] = '显示所有角色的物品数量';
 end

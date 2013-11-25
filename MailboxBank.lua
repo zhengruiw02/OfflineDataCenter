@@ -1173,6 +1173,32 @@ function MB:GetLeftTimeText(mailIndex)
 	return lefttext, leftday
 end
 
+function MB:GameTooltip_OnTooltipCleared(tt)
+	if ( not tt ) then
+		tt = GameTooltip;
+	end
+	tt.itemCleared = nil
+end
+
+function MB:GameTooltip_OnTooltipSetItem(tt)
+	if ( not tt ) then
+		tt = GameTooltip;
+	end
+	if not tt.itemCleared then
+		tt:AddLine(" ")
+		local item, link = tt:GetItem()
+		if IsAltKeyDown() and link ~= nil then
+			//循环读取DB统计数量
+		
+		
+		else
+			tt:AddDoubleLine('|cFFCA3C3C'..L['Hold down the ALT key']..'|r', L['Show the number of items for all Character'])
+		end		
+		
+		tt.itemCleared = true;
+	end		
+end
+
 function MB:TooltipShow(self)--self=slot
 	if selectTab ~= "mail" then 
 		if self and self.link then
@@ -1608,6 +1634,8 @@ function MB:OnInitialize()
 	self:RegisterEvent("BANKFRAME_CLOSED")
 	self:SecureHook('OpenAllBags', 'OpenBags');
 	self:SecureHook('ToggleBag', 'OpenBags');
+	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
+	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	self:RegisterEvent("MAIL_SHOW")
 	self:RegisterEvent("MAIL_CLOSED")
 	if MB_config == nil then MB_config = {} end
