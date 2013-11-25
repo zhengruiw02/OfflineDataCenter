@@ -35,4 +35,5 @@ if L then
 	L['Offline MailBox'] = '离线邮箱';
 	L['Offline Bag'] = '离线背包';
 	L['Offline Bank'] = '离线银行';
+	L['Offline Frame'] = '离线窗口';
 end

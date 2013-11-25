@@ -8,7 +8,7 @@
 	--UC.. to optimize
 
 --@@ TODO: optimize & combine same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
-local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank", "AceEvent-3.0", "AceTimer-3.0")
+local MB = LibStub("AceAddon-3.0"):NewAddon("MailboxBank", "AceHook-3.0", "AceEvent-3.0", "AceTimer-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("MailboxBank")
 --local AT = LibStub("AceTimer-3.0"):NewAddon("MailboxBank")
 local getn, tinsert = table.getn, table.insert
@@ -711,7 +711,8 @@ function MB:SortMenuInitialize(self)
 	--MailboxBankFrameSortDropDown:SetWidth(width+60)
 end
 
-function MB:ChooseChar_OnClick(self) ---!!!
+--function MB:ChooseChar_OnClick(self) ---!!!
+local function ChooseChar_OnClick(self)
 	selectChar = self.value
 	UIDropDownMenu_SetSelectedValue(MB.Frame.chooseChar, self.value);
 	MB:SearchBarResetAndClear()
@@ -723,7 +724,8 @@ function MB:ChooseChar_OnClick(self) ---!!!
 	MB.Frame.chooseChar:SetWidth(width+60)	
 end
 
-function MB:ChooseCharMenuInitialize(self)
+--function MB:ChooseCharMenuInitialize(self, level)
+local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
@@ -731,7 +733,7 @@ function MB:ChooseCharMenuInitialize(self)
 			info.text = k
 			info.value = k
 			info.func = function(self)
-				MB:ChooseChar_OnClick(self)
+				ChooseChar_OnClick(self)
 			end;
 			UIDropDownMenu_AddButton(info, level)
 		end
@@ -743,11 +745,14 @@ function MB:ChooseCharMenuInitialize(self)
 	MB.Frame.chooseChar:SetWidth(width+60)
 end
 
-function MB:SetActiveTab(typeStr)
-	for k, v in pairs(MB.TabTooltip) do
-		_G["MailboxBankFrame"..k..'Tab']:SetChecked(false)
+function MB:SetActiveTab(typeStr, from)
+	if not from then
+		for k, v in pairs(MB.TabTooltip) do
+			_G["MailboxBankFrame"..k..'Tab']:SetChecked(false)
+		end
+		_G["MailboxBankFrame"..typeStr..'Tab']:SetChecked(true)
 	end
-	_G["MailboxBankFrame"..typeStr..'Tab']:SetChecked(true)
+
 	if typeStr == 'mail' then
 		G_DB = MB_DB
 	else
@@ -759,8 +764,12 @@ function MB:SetActiveTab(typeStr)
 	--重新初始化各下拉选项框
 	--根据新的DB刷新SLOT
 	selectTab = typeStr
-	MB:Update("sort")
+
 	--MB:FrameShow()
+	if from then
+		MB:FrameShow()
+	end
+	MB:Update("sort")
 end
 	
 function MB:CreateMailboxBankFrame()
@@ -926,7 +935,7 @@ function MB:CreateMailboxBankFrame()
 			S:HandleDropDownBox(f.filter)
 			S:HandleDropDownBox(f.chooseChar)
 			S:HandleButton(f.CollectGoldButton)
-			S:HandleScrollBar(f.scrollBar);
+			S:HandleScrollBar(_G[name.."ScrollBarScrollBar"])
 		end
 	end
 	
@@ -1031,9 +1040,10 @@ function MB:CreateMailboxBankFrame()
 		MB:Update()
 	end)
 	
-	UIDropDownMenu_Initialize(f.chooseChar, function(self)
-		MB:ChooseCharMenuInitialize(self)
-	end)
+--	UIDropDownMenu_Initialize(f.chooseChar, function(self)
+--		MB:ChooseCharMenuInitialize(self)
+--	end)
+	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
 	
 	UIDropDownMenu_Initialize(f.sortmethod, function(self)
 		MB:SortMenuInitialize(self)
@@ -1048,7 +1058,6 @@ function MB:CreateMailboxBankFrame()
 		if ElvUI then
 			--local S = ElvUI[1]:GetModule("Skins")
 			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
-			tabIndex = tabIndex + 1
 			tab:DisableDrawLayer("BACKGROUND")
 			tab:SetNormalTexture(v)
 			tab:GetNormalTexture():ClearAllPoints()
@@ -1063,6 +1072,7 @@ function MB:CreateMailboxBankFrame()
 			tab:SetPoint("TOPLEFT", object, "TOPRIGHT", 0, (-44 * tabIndex) + 18)
 			tab:SetNormalTexture(v)
 		end	
+		tabIndex = tabIndex + 1
 		tab:SetAttribute("type", "spell")
 		tab:SetAttribute("spell", name)
 		tab.typeStr = k
@@ -1438,17 +1448,17 @@ end
 
 local MailboxBankPopMenu = {
 	{text = L['Offline MailBox'],
-	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('mail') end},
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('mail', true) end},
 	{text = L['Offline Bag'],
-	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bag') end},
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bag', true) end},
 	{text = L['Offline Bank'], 
-	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bank') end},
+	func = function() PlaySound("igMainMenuOpen"); MB:SetActiveTab('bank', true) end},
 }
 
 local function DropDown(list, frame, xOffset, yOffset)
 	if not frame.buttons then
 		frame.buttons = {}
-		frame:SetFrameStrata("DIALOG")
+		frame:SetFrameStrata("TOOLTIP")
 		frame:SetClampedToScreen(true)
 		tinsert(UISpecialFrames, frame:GetName())
 		frame:Hide()
@@ -1527,7 +1537,11 @@ function MB:CreateToggleButton(f, x, y)
 	if ElvUI then
 		frame:StyleButton()
 		frame:SetTemplate("Transparent")
-	end	
+		menuFrame:SetTemplate("Transparent")
+	else
+		frame:SetDisabledTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
+		frame:SetHighlightTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga", "ADD")	
+	end
 	frame:RegisterForClicks('AnyUp', 'AnyDown')
 	frame:SetScript("OnClick", function(self)
 		DropDown(MailboxBankPopMenu, menuFrame)
@@ -1537,7 +1551,7 @@ function MB:CreateToggleButton(f, x, y)
 	frame:SetPushedTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
 	frame:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:AddLine('Offline Frame')
+		GameTooltip:AddLine(L['Offline Frame'])
 		GameTooltip:SetClampedToScreen(true)
 		GameTooltip:Show()
 	end)
@@ -1582,11 +1596,18 @@ function MB:MAIL_CLOSED()
 	self:FrameHide()
 end
 
+function MB:OpenBags()
+	self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20)
+	self:CreateToggleButton(ContainerFrame1, 2, -2)
+end
+
 function MB:OnInitialize()
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:RegisterEvent("BAG_UPDATE_DELAYED")
 	self:RegisterEvent("BANKFRAME_OPENED")
 	self:RegisterEvent("BANKFRAME_CLOSED")
+	self:SecureHook('OpenAllBags', 'OpenBags');
+	self:SecureHook('ToggleBag', 'OpenBags');
 	self:RegisterEvent("MAIL_SHOW")
 	self:RegisterEvent("MAIL_CLOSED")
 	if MB_config == nil then MB_config = {} end
