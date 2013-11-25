@@ -200,6 +200,10 @@ function MB:SearchBarResetAndClear()
 	self.Frame.searchingBar:SetText("");
 end
 
+local function GetItemID(itemLink)
+	return tonumber(match(itemLink, "item:(%d+)"))
+end
+
 ---- Sorting ----
 
 function MB:BuildSortOrder()
@@ -278,7 +282,7 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 		return
 	end
 	if not attachIndex then return end
-	local itemID = tonumber(match(G_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
+	local itemID = GetItemID(G_DB[selectChar][mailIndex][attachIndex].itemLink)
 	local itemIdxTb = {mailIndex = mailIndex,attachIndex = attachIndex}
 	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
 		subIdxTb[subIdx][1] = {itemID = itemID}--,["count"] = 1}
@@ -314,6 +318,10 @@ function MB:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 	end
 end
 
+local function SelectSortMethod()
+
+end
+
 MB.SelectSortMethod = {
 	["No sorting"] = function(self, mailIndex, attachIndex)
 		local keyword = L["No sorting"]
@@ -321,7 +329,7 @@ MB.SelectSortMethod = {
 	end,
 	["AH"] = function(self, mailIndex, attachIndex)
 		if not self.AhSortIndex then self:BuildSortOrder() end
-		local itemID = tonumber(match(G_DB[selectChar][mailIndex][attachIndex].itemLink, "item:(%d+)"))
+		local itemID = GetItemID(G_DB[selectChar][mailIndex][attachIndex].itemLink)
 		local _, _, itemRarity, _, _, itemType, _, _, _, _, _ = GetItemInfo(itemID)
 		self:InsertToIndexTable(itemType, mailIndex, attachIndex, "AH")
 	end,
@@ -727,7 +735,7 @@ end
 --function MB:ChooseCharMenuInitialize(self, level)
 local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(MB_DB) do
+	for k, v in pairs(BB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 			local info = UIDropDownMenu_CreateInfo()
 			info.text = k
@@ -1180,6 +1188,49 @@ function MB:GameTooltip_OnTooltipCleared(tt)
 	tt.itemCleared = nil
 end
 
+function MB:AddItemTooltip(characterName, count, found)
+	if not found[characterName] then
+		found[characterName] = 0
+	end
+	found[characterName] = found[characterName] + count
+end
+
+function MB:LookupSameItem(itemID)
+	local Found = {}
+	local BagIDs = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+	for char, BB_Table in pairs(BB_DB) do --assume all character has this db
+		if type(char) == 'string' and type(BB_Table) == 'table' then
+			for i, bag in pairs(BagIDs) do
+				if BB_Table[bag] then
+					for j = 1, BB_Table[bag].slotMAX do
+						if BB_Table[bag][j] then
+							if GetItemID(BB_Table[bag][j].itemLink) == itemID then
+								self:AddItemTooltip(char, BB_Table[bag][j].count, Found)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	for char, MB_Table in pairs(MB_DB) do --assume all character has this db
+		if type(char) == 'string' and type(MB_Table) == 'table' then
+			for i = 1, MB_Table.mailCount do
+				if not MB_Table[i].CODAmount then
+					for j, MB_subTable in pairs(MB_Table[i]) do
+						if type(MB_subTable) == "table" then
+							if GetItemID(MB_subTable.itemLink) == itemID then
+								self:AddItemTooltip(char, MB_subTable.count, Found)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return Found
+end
+
 function MB:GameTooltip_OnTooltipSetItem(tt)
 	if ( not tt ) then
 		tt = GameTooltip;
@@ -1188,9 +1239,11 @@ function MB:GameTooltip_OnTooltipSetItem(tt)
 		tt:AddLine(" ")
 		local item, link = tt:GetItem()
 		if IsAltKeyDown() and link ~= nil then
-			//循环读取DB统计数量
-		
-		
+			local itemID = GetItemID(link)
+			local Found = self:LookupSameItem(itemID)
+			for k, v in pairs(Found) do
+				tt:AddDoubleLine('|cFFCA3C3C'..k..'|r', v)
+			end
 		else
 			tt:AddDoubleLine('|cFFCA3C3C'..L['Hold down the ALT key']..'|r', L['Show the number of items for all Character'])
 		end		
@@ -1216,7 +1269,7 @@ function MB:TooltipShow(self)--self=slot
 	local method = UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown)
 	--local sender, wasReturned
 	if method =="money" then
-					local x = self:GetRight();
+			local x = self:GetRight();
 			if ( x >= ( GetScreenWidth() / 2 ) ) then
 				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
 			else
