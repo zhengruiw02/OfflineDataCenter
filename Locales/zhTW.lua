@@ -1,6 +1,6 @@
-local L = LibStub("AceLocale-3.0"):NewLocale("MailboxBank", "zhTW")
+local L = LibStub("AceLocale-3.0"):NewLocale("OfflineDataCenter", "zhTW")
 if L then
-	L["MailboxBank"] = "郵箱銀行"
+	L["Offline Data Center"] = "郵箱銀行"
 	L["UNKNOWN SENDER"] = "\[未知發件人\]"
 	L["Stack items"] = "堆疊物品"
 	L["No sorting"] = "不排序"
