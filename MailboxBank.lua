@@ -1181,11 +1181,11 @@ function MB:GetLeftTimeText(mailIndex)
 	return lefttext, leftday
 end
 
-function MB:GameTooltip_OnTooltipCleared(tt)
-	if ( not tt ) then
-		tt = GameTooltip;
+function MB:GameTooltip_OnTooltipCleared(TT)
+	if ( not TT ) then
+		TT = GameTooltip;
 	end
-	tt.itemCleared = nil
+	TT.ItemCleared = nil
 end
 
 function MB:AddItemTooltip(characterName, count, found)
@@ -1231,24 +1231,24 @@ function MB:LookupSameItem(itemID)
 	return Found
 end
 
-function MB:GameTooltip_OnTooltipSetItem(tt)
-	if ( not tt ) then
-		tt = GameTooltip;
+function MB:GameTooltip_OnTooltipSetItem(TT)
+	if ( not TT ) then
+		TT = GameTooltip;
 	end
-	if not tt.itemCleared then
-		tt:AddLine(" ")
-		local item, link = tt:GetItem()
+	if not TT.ItemCleared then
+		TT:AddLine(" ")
+		local item, link = TT:GetItem()
 		if IsAltKeyDown() and link ~= nil then
 			local itemID = GetItemID(link)
 			local Found = self:LookupSameItem(itemID)
 			for k, v in pairs(Found) do
-				tt:AddDoubleLine('|cFFCA3C3C'..k..'|r', v)
+				TT:AddDoubleLine('|cFFCA3C3C'..k..'|r', v)
 			end
 		else
-			tt:AddDoubleLine('|cFFCA3C3C'..L['Hold down the ALT key']..'|r', L['Show the number of items for all Character'])
+			TT:AddDoubleLine('|cFFCA3C3C'..L['Hold down the ALT key']..'|r', L['Show the number of items for all Character'])
 		end		
 		
-		tt.itemCleared = true;
+		TT.ItemCleared = true;
 	end		
 end
 
