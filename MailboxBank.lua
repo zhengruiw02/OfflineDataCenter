@@ -1515,7 +1515,7 @@ function MB:BagUpdateDelayed()
 end
 
 function MB:FrameShow()
-	self:UpdateContainer()
+	-- self:UpdateContainer()
 	self.Frame:Show()
 end
 
@@ -1739,9 +1739,9 @@ function MB:BANKFRAME_CLOSED()
 end
 
 function MB:MAIL_SHOW()
-	if not self.Frame:IsVisible() then 
-		self:FrameShow();
-	end
+	-- if not self.Frame:IsVisible() then 
+		-- self:FrameShow();
+	-- end
 end
 
 function MB:MAIL_CLOSED()
