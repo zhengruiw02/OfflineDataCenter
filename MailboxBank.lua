@@ -107,7 +107,28 @@ end
 get position(sortDB, filter, updateContainer):
 from i, j (mailIndex, attachIndex)
 ]]
---MB.BagIDs = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+
+function MB:AddItemEquipped(itemLink, slotID)
+	IN_DB[playername][1][slotID] = {count = 1, itemLink = itemLink}
+end
+--[[
+IN_DB structure:
+							INVSLOT
+[charName] = {	[1]		{	[1]			{	.count
+							[2]				.itemLink
+				["stat"]{	.stat1
+							.statN
+]]
+function MB:CheckEquipped()
+	if not IN_DB[playername] then
+		IN_DB[playername] = {}
+		IN_DB[playername][1] = {}
+	end
+	for slotID = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+		local link = GetInventoryItemLink("player", slotID);
+		self:AddItemEquipped(link, slotID)
+	end
+end
 
 function MB:CheckBags()
 	if not BB_DB[playername] then BB_DB[playername] = {} end
@@ -710,16 +731,13 @@ function MB:SortMenuInitialize(self)
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	--if UIDropDownMenu_GetSelectedValue(MailboxBankFrameSortDropDown) == nil then
-		UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "No sorting");
-	--end
+	UIDropDownMenu_SetSelectedValue(MailboxBankFrameSortDropDown, "No sorting");
 	--local text = MailboxBankFrameSortDropDownText;
 	--local width = text:GetStringWidth();
 	--UIDropDownMenu_SetWidth(MailboxBankFrameSortDropDown, width+40);
 	--MailboxBankFrameSortDropDown:SetWidth(width+60)
 end
 
---function MB:ChooseChar_OnClick(self) ---!!!
 local function ChooseChar_OnClick(self)
 	selectChar = self.value
 	UIDropDownMenu_SetSelectedValue(MB.Frame.chooseChar, self.value);
@@ -732,7 +750,6 @@ local function ChooseChar_OnClick(self)
 	MB.Frame.chooseChar:SetWidth(width+60)	
 end
 
---function MB:ChooseCharMenuInitialize(self, level)
 local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(BB_DB) do
@@ -763,6 +780,8 @@ function MB:SetActiveTab(typeStr, from)
 
 	if typeStr == 'mail' then
 		G_DB = MB_DB
+	elseif type == 'inventory' then
+		G_DB = IN_DB
 	else
 		G_DB = BB_DB
 	end
@@ -1719,7 +1738,7 @@ end
 
 function MB:MAIL_INBOX_UPDATE()
 	self:CheckMail()
-	if selectChar == playername then
+	if self.Frame:IsVisible() and selectChar == playername and selectTab = "mail" then
 		self:Update("sort")
 	end
 end
@@ -1745,7 +1764,19 @@ function MB:MAIL_SHOW()
 end
 
 function MB:MAIL_CLOSED()
-	self:FrameHide()
+	-- self:FrameHide()
+end
+
+function MB:UNIT_INVENTORY_CHANGED()
+	self:CheckEquipped()
+end
+
+function MB:ITEM_UPGRADE_MASTER_UPDATE()
+	self:CheckEquipped()
+end
+
+function MB:REPLACE_ENCHANT()
+	self:CheckEquipped()
 end
 
 function MB:OpenBags()
@@ -1758,6 +1789,9 @@ function MB:OnInitialize()
 	self:RegisterEvent("BAG_UPDATE_DELAYED")
 	self:RegisterEvent("BANKFRAME_OPENED")
 	self:RegisterEvent("BANKFRAME_CLOSED")
+	self:RegisterEvent("UNIT_INVENTORY_CHANGED");
+	self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
+	self:RegisterEvent("REPLACE_ENCHANT");
 	self:SecureHook('OpenAllBags', 'OpenBags');
 	self:SecureHook('ToggleBag', 'OpenBags');
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
@@ -1776,7 +1810,7 @@ function MB:OnInitialize()
 	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
 	if not BB_DB[playername] then BB_DB[playername] = {} end
 	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	
+	if not IN_DB[playername] then IN_DB[playername] = {} end
 	self:CreateMailboxBankFrame()
 	self:SetActiveTab('mail')
 	
