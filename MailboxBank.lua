@@ -461,7 +461,7 @@ function MB:SortDB()
 	subIdxTb = {}
 	--subIdxTb.method = method
 	revSubIdxTb = {__count = 0}
-	--if not G_DB[selectChar] then return end
+	if not G_DB[selectChar] then return end --by eui.cc
 	if selectTab == "mail" then
 		if not G_DB[selectChar].itemCount then return end
 		for mailIndex = 1, G_DB[selectChar].mailCount do
@@ -1077,7 +1077,7 @@ function MB:CreateMailboxBankFrame()
 			tab.backdrop:SetAllPoints()
 			tab:StyleButton()
 		else
-			tab:SetPoint("TOPLEFT", object, "TOPRIGHT", 0, (-44 * tabIndex) + 18)
+			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, (-48 * tabIndex) + 18)
 			tab:SetNormalTexture(v)
 		end	
 		tabIndex = tabIndex + 1
@@ -1562,7 +1562,7 @@ local function DropDown(list, frame, xOffset, yOffset)
 
 			frame.buttons[i].text = frame.buttons[i]:CreateFontString(nil, 'BORDER')
 			frame.buttons[i].text:SetAllPoints()
-			frame.buttons[i].text:SetFont(STANDARD_TEXT_FONT, 10, 'OUTLINE')
+			frame.buttons[i].text:SetFont(STANDARD_TEXT_FONT, 14, 'OUTLINE')
 			frame.buttons[i].text:SetJustifyH("LEFT")
 
 			frame.buttons[i]:SetScript("OnEnter", function(btn)
@@ -1604,41 +1604,115 @@ local function DropDown(list, frame, xOffset, yOffset)
 end
 
 local menuFrame = CreateFrame("Frame", "MailboxBankClickMenu", UIParent)
+menuFrame:SetBackdrop({
+	bgFile = [[Interface\DialogFrame\UI-DialogBox-Background]],
+	edgeFile = [[Interface\DialogFrame\UI-DialogBox-Border]],
+	tile = true, tileSize = 32, edgeSize = 32,
+	insets = { left = 11, right = 12, top = 12, bottom = 11 }
+})
 
-function MB:CreateToggleButton(f, x, y)
+function MB:CreateToggleButton(f)
 	if not f then return; end
 	
-	if _G[f:GetName().."OfflineToogleButton"] then
-		return _G[f:GetName().."OfflineToogleButton"]
-	end		
-	
-	local frame = CreateFrame("Button", f:GetName().."OfflineToogleButton", f)
-	if ElvUI then
-		frame:StyleButton()
-		frame:SetTemplate("Transparent")
-		menuFrame:SetTemplate("Transparent")
-	else
-		frame:SetDisabledTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
-		frame:SetHighlightTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga", "ADD")	
+	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
+		ContainerFrame1PortraitButton:RegisterForClicks('AnyUp', 'AnyDown')
+		ContainerFrame1PortraitButton:EnableMouse(true)
+		ContainerFrame1PortraitButton:SetScript("OnClick", function(self)
+			DropDown(MailboxBankPopMenu, menuFrame)
+		end)
+		ContainerFrame1PortraitButton:HookScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			GameTooltip:AddLine(L['Offline Frame'])
+			GameTooltip:AddLine(BACKPACK_TOOLTIP, 1.0, 1.0, 1.0);
+			if (GetBindingKey("TOGGLEBACKPACK")) then
+				GameTooltip:AddLine(" "..NORMAL_FONT_COLOR_CODE.."("..GetBindingKey("TOGGLEBACKPACK")..")"..FONT_COLOR_CODE_CLOSE)
+			end
+			GameTooltip:SetClampedToScreen(true)
+			GameTooltip:Show()
+		end)		
+		ContainerFrame1PortraitButton.dropdownmenu = true
+		return ContainerFrame1PortraitButton
 	end
-	frame:RegisterForClicks('AnyUp', 'AnyDown')
-	frame:SetScript("OnClick", function(self)
-		DropDown(MailboxBankPopMenu, menuFrame)
-	end)
-	frame:SetSize(18, 18)
-	frame:SetNormalTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
-	frame:SetPushedTexture("Interface\\AddOns\\MailboxBank\\textures\\button.tga")
-	frame:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:AddLine(L['Offline Frame'])
-		GameTooltip:SetClampedToScreen(true)
-		GameTooltip:Show()
-	end)
-	frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	frame:SetClampedToScreen(true)
-	frame:SetPoint("TOPLEFT", x or 20, y or -10)
+
+	if ElvUI and not f.offlineBagButton then
+		--offline button
+		f.offlineBagButton = CreateFrame('Button', nil, f)
+		f.offlineBagButton:Height(20)
+		f.offlineBagButton:Width(20)
+		f.offlineBagButton:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
+		f.offlineBagButton:SetFrameLevel(f:GetFrameLevel() + 2)
+		f.offlineBagButton:SetTemplate('Default')
+		f.offlineBagButton:StyleButton()
+		f.offlineBagButton:SetNormalTexture(MB.TabTextures['bag'])
+		f.offlineBagButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+		f.offlineBagButton:GetNormalTexture():SetInside()
+		f.offlineBagButton:CreateBackdrop("Default")
+		f.offlineBagButton.backdrop:SetAllPoints()
+		f.offlineBagButton:SetScript("OnClick", function()
+			MB:SetActiveTab('bag', true)
+		end)
+		f.offlineBagButton:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
+			GameTooltip:ClearLines()
+			GameTooltip:AddLine(L['Offline Bag'])
+			GameTooltip:Show()
+		end)
+		f.offlineBagButton:SetScript("OnLeave", function(self)
+			GameTooltip:Hide()
+		end)
+		
+		f.offlineBankButton = CreateFrame('Button', nil, f)
+		f.offlineBankButton:Height(20)
+		f.offlineBankButton:Width(20)
+		f.offlineBankButton:Point('LEFT', f.offlineBagButton, 'RIGHT', 6, 0)
+		f.offlineBankButton:SetFrameLevel(f:GetFrameLevel() + 2)
+		f.offlineBankButton:StyleButton()
+		f.offlineBankButton:SetTemplate('Default')
+		f.offlineBankButton:SetNormalTexture(MB.TabTextures['bank'])
+		f.offlineBankButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+		f.offlineBankButton:GetNormalTexture():SetInside()
+		f.offlineBankButton:CreateBackdrop("Default")
+		f.offlineBankButton.backdrop:SetAllPoints()
+		f.offlineBankButton:SetScript("OnClick", function()
+			MB:SetActiveTab('bank', true)
+		end)
+		f.offlineBankButton:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
+			GameTooltip:ClearLines()
+			GameTooltip:AddLine(L['Offline Bank'])
+			GameTooltip:Show()
+		end)
+		f.offlineBankButton:SetScript("OnLeave", function(self)
+			GameTooltip:Hide()
+		end)
+		
+		f.offlineMailBoxButton = CreateFrame('Button', nil, f)
+		f.offlineMailBoxButton:Height(20)
+		f.offlineMailBoxButton:Width(20)
+		f.offlineMailBoxButton:Point('LEFT', f.offlineBankButton, 'RIGHT', 6, 0)
+		f.offlineMailBoxButton:SetFrameLevel(f:GetFrameLevel() + 2)
+		f.offlineMailBoxButton:SetNormalTexture(MB.TabTextures['mail'])
+		f.offlineMailBoxButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+		f.offlineMailBoxButton:GetNormalTexture():SetInside()
+		f.offlineMailBoxButton:CreateBackdrop("Default")
+		f.offlineMailBoxButton.backdrop:SetAllPoints()
+		f.offlineMailBoxButton:StyleButton()
+		f.offlineMailBoxButton:SetTemplate('Default')		
+		f.offlineMailBoxButton:SetScript("OnClick", function()
+			MB:SetActiveTab('mail', true)
+		end)
+		f.offlineMailBoxButton:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
+			GameTooltip:ClearLines()
+			GameTooltip:AddLine(L['Offline MailBox'])
+			GameTooltip:Show()
+		end)
+		f.offlineMailBoxButton:SetScript("OnLeave", function(self)
+			GameTooltip:Hide()
+		end)		
+	end
 	
-	return frame
+	return f
 end
 
 ---- Event ----
@@ -1657,7 +1731,6 @@ end
 
 function MB:BANKFRAME_OPENED()
 	self.isBankOpened = true
-	self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
 	self:CheckBags()
 end
 
@@ -1676,8 +1749,8 @@ function MB:MAIL_CLOSED()
 end
 
 function MB:OpenBags()
-	self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20)
-	self:CreateToggleButton(ContainerFrame1, 2, -2)
+	self:CreateToggleButton(ElvUI_ContainerFrame)
+	self:CreateToggleButton(ContainerFrame1)
 end
 
 function MB:OnInitialize()
@@ -1700,13 +1773,12 @@ function MB:OnInitialize()
 	end]]
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
+	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
+	if not BB_DB[playername] then BB_DB[playername] = {} end
+	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
+	
 	self:CreateMailboxBankFrame()
 	self:SetActiveTab('mail')
-	
-	self:CreateToggleButton(ElvUI_BankContainerFrame, 30, -20)
-	self:CreateToggleButton(ElvUI_ContainerFrame, 30, -20)
-	self:CreateToggleButton(ContainerFrame1, 2, -2)
-	self:CreateToggleButton(BankFrame, 2, -2)
 	
 	self:AlertDeadlineMails()
 	hooksecurefunc("SendMail", function() self:HookSendMail() end)
