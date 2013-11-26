@@ -771,11 +771,12 @@ local function ChooseCharMenuInitialize(self, level)
 end
 
 function MB:SetActiveTab(typeStr, from)
-	if not from then
-		for k, v in pairs(MB.TabTooltip) do
+	for k, v in pairs(MB.TabTooltip) do
+		if k == typeStr then
+			_G["MailboxBankFrame"..k..'Tab']:SetChecked(true)
+		else
 			_G["MailboxBankFrame"..k..'Tab']:SetChecked(false)
 		end
-		_G["MailboxBankFrame"..typeStr..'Tab']:SetChecked(true)
 	end
 
 	if typeStr == 'mail' then
