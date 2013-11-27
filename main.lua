@@ -1703,7 +1703,7 @@ end
 
 function ODC:MAIL_INBOX_UPDATE()
 	self:CheckMail()
-	if self.Frame:IsVisible() and selectChar == playername and selectTab = "mail" then
+	if self.Frame:IsVisible() and selectChar == playername and selectTab == "mail" then
 		self:Update("sort")
 	end
 end
@@ -1772,6 +1772,7 @@ function ODC:OnInitialize()
 	end]]
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
+	if not IN_DB then IN_DB = {} end
 	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
 	if not BB_DB[playername] then BB_DB[playername] = {} end
 	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
