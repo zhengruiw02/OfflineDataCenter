@@ -23,13 +23,13 @@ ODC.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
 	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
 	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
-	["char"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp",
+	["inventory"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp",
 }
 ODC.TabTooltip = {
 	["bag"] = L['Offline Bag'], 
 	["bank"] = L['Offline Bank'], 
 	["mail"] = L['Offline MailBox'],
-	["char"] = L['Offline Character'],
+	["inventory"] = L['Offline Character'],
 }
 --local ODC = CreateFrame("Frame", nil , UIParent)
 local G_DB
@@ -127,7 +127,9 @@ function ODC:CheckEquipped()
 	end
 	for slotID = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
 		local link = GetInventoryItemLink("player", slotID);
-		self:AddItemEquipped(link, slotID)
+		if link then
+			self:AddItemEquipped(link, slotID)
+		end
 	end
 end
 
@@ -229,10 +231,11 @@ end
 ---- Sorting ----
 
 function ODC:BuildSortOrder()
-	self.AhSortIndex = {}
+	self.AhSortIndex = {__count = 0}
 	--local c = 0;
 	for i, iType in ipairs({GetAuctionItemClasses()}) do
 		self.AhSortIndex[iType] = i
+		self.AhSortIndex.__count = self.AhSortIndex.__count + 1
 		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
 			-- c = c + 1;
 			-- self.AhSortIndex[isType] = c;
@@ -250,7 +253,14 @@ function ODC:UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncomm
 		insertIndex = revSubIdxTb.__count
 	elseif method == "AH" then--table is not empty
 		local AhIndex = self.AhSortIndex[keyword]
+		if not AhIndex then
+			self.AhSortIndex.__count = self.AhSortIndex.__count + 1
+			self.AhSortIndex[keyword] = self.AhSortIndex.__count
+			AhIndex = self.AhSortIndex.__count
+			
+		end
 		for i, v in ipairs(subIdxTb) do --table is not empty
+			
 			if self.AhSortIndex[subIdxTb[i].keyword] > AhIndex then --can insert before end of table
 				for ii = i, revSubIdxTb.__count do --move items after current key
 					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
@@ -511,7 +521,7 @@ function ODC:SortDB()
 				end
 			end
 		end
-	else
+	elseif selectTab == "bag" then
 		local BagIDs = {0, 1, 2, 3, 4}
 		for i, bagIndex in ipairs(BagIDs) do
 			if G_DB[selectChar][bagIndex] then
@@ -519,6 +529,14 @@ function ODC:SortDB()
 					if type(G_DB[selectChar][bagIndex][slotIndex]) == "table" then
 						self.SelectSortMethod[method](self, bagIndex, slotIndex)
 					end
+				end
+			end
+		end
+	elseif selectTab == "inventory" then
+		if G_DB[selectChar][1] then
+			for invIndex, invTable in pairs(G_DB[selectChar][1]) do
+				if type(invTable) == "table" then
+					self.SelectSortMethod[method](self, 1, invIndex)
 				end
 			end
 		end
@@ -550,13 +568,16 @@ function ODC:UpdateContainer()
 	if sumQ ~= "" then
 		sumQ = "\r\n"..L["Quality summary: "]..sumQ
 	end
-	local former
-	if selectTab == "mail" then
-		former = L["Mailbox gold: "]
-	else
-		former = L["Character gold: "]
+	local former = ""
+	if G_DB[selectChar].money then
+		if selectTab == "mail" then
+			former = L["Mailbox gold: "]
+		elseif selectTab == "bag" or selectTab == "bank" then
+			former = L["Character gold: "]
+		end
+		former = former .. GetCoinTextureString(G_DB[selectChar].money)
 	end
-	self.Frame.mailboxGoldText:SetText(former..GetCoinTextureString(G_DB[selectChar].money)..sumQ)
+	self.Frame.mailboxGoldText:SetText(former..sumQ)
 	--self.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectChar].checkMailTick)/60).." 分鐘前掃描" or "");
 
 	local offset = FauxScrollFrame_GetOffset(self.Frame.scrollBar)
@@ -675,7 +696,7 @@ function ODC:Filter_OnClick(self)
 end
 
 function ODC:FilterMenuInitialize(self)
-	if not revSubIdxTb then return end
+	--if not revSubIdxTb then return end
 	local info = UIDropDownMenu_CreateInfo();
 	info = UIDropDownMenu_CreateInfo()
 	info.text = ALL
@@ -703,10 +724,10 @@ function ODC:FilterMenuInitialize(self)
 		end;
 		UIDropDownMenu_AddButton(info, level)
 	end
-	if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
+	--if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
 		UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, "__all");
 		selectSortChanged = nil
-	end
+	--end
 end
 
 function ODC:SortMethod_OnClick(self)
@@ -799,6 +820,7 @@ function ODC:SetActiveTab(typeStr, from)
 		ODC:FrameShow()
 	end
 	ODC:Update("sort")
+	
 end
 	
 function ODC:CreateODCFrame()
@@ -1327,16 +1349,6 @@ function ODC:TooltipShow(self)--self=slot
 		end
 		
 		local lefttext, leftday = ODC:GetLeftTimeText(mIdx[i])
-		-- local lefttext = L["+ Left time: "]
-		-- local dayLeftTick = difftime(floor(MB_DB[selectChar][mIdx[i]].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
-		-- local leftday = floor(dayLeftTick / 86400)
-		-- if leftday > 0 then
-			-- lefttext = lefttext..format("> %d "..DAYS,leftday)
-		-- else
-			-- local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
-			-- local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-			-- lefttext = lefttext..format( lefthour > 0 and "%d"..HOURS or "" ,lefthour)..format( leftminute > 0 and "%d"..MINUTES or "",leftminute)--tostring(lefthour)..HOURS..tostring(leftminute)..MINUTES
-		-- end
 		
 		local foundSameLefttime = false
 		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
@@ -1361,7 +1373,6 @@ function ODC:TooltipShow(self)--self=slot
 				row.righttext = L["pay for: "]..GetCoinTextureString(MB_DB[selectChar][mIdx[i]].CODAmount)
 				row.cod = true
 				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-				--GameTooltip:AddDoubleLine(COD.." "..ITEMS, L["pay for: "]..GetCoinTextureString(self.CODAmount), 1, 0, 0.5)
 			end
 			
 			if MB_DB[selectChar][mIdx[i]].wasReturned then
@@ -1370,7 +1381,6 @@ function ODC:TooltipShow(self)--self=slot
 				row.righttext = ""
 				row.wasreturned = true
 				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-				--GameTooltip:AddLine(L["was returned"])
 			end
 		end
 		
@@ -1750,6 +1760,14 @@ function ODC:OpenBags()
 end
 
 function ODC:OnInitialize()
+	if MB_config == nil then MB_config = {} end
+	if not MB_DB then MB_DB = {} end
+	if not BB_DB then BB_DB = {} end
+	if not IN_DB then IN_DB = {} end
+	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
+	if not BB_DB[playername] then BB_DB[playername] = {} end
+	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
+	if not IN_DB[playername] then self:CheckEquipped() end
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:RegisterEvent("BAG_UPDATE_DELAYED")
 	self:RegisterEvent("BANKFRAME_OPENED")
@@ -1763,20 +1781,12 @@ function ODC:OnInitialize()
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	self:RegisterEvent("MAIL_SHOW")
 	self:RegisterEvent("MAIL_CLOSED")
-	if MB_config == nil then MB_config = {} end
 	--[[if self.config_const == nil then
 		self.config_const = {}
 		for k ,v in pairs(self.config_init) do
 			self.config_const[k] = v;
 		end
 	end]]
-	if not MB_DB then MB_DB = {} end
-	if not BB_DB then BB_DB = {} end
-	if not IN_DB then IN_DB = {} end
-	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
-	if not BB_DB[playername] then BB_DB[playername] = {} end
-	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	if not IN_DB[playername] then IN_DB[playername] = {} end
 	self:CreateODCFrame()
 	self:SetActiveTab('mail')
 	
