@@ -23,11 +23,13 @@ ODC.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
 	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
 	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
+	["char"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp",
 }
 ODC.TabTooltip = {
 	["bag"] = L['Offline Bag'], 
 	["bank"] = L['Offline Bank'], 
 	["mail"] = L['Offline MailBox'],
+	["char"] = L['Offline Character'],
 }
 --local ODC = CreateFrame("Frame", nil , UIParent)
 local G_DB
@@ -780,7 +782,7 @@ function ODC:SetActiveTab(typeStr, from)
 
 	if typeStr == 'mail' then
 		G_DB = MB_DB
-	elseif type == 'inventory' then
+	elseif typeStr == 'inventory' then
 		G_DB = IN_DB
 	else
 		G_DB = BB_DB
@@ -801,7 +803,7 @@ end
 	
 function ODC:CreateODCFrame()
 	----Create ODC bank frame
-	local f = CreateFrame("Frame", nil , UIParent)
+	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
 	ODC.Frame = f
 	
 	if ElvUI then
@@ -816,6 +818,7 @@ function ODC:CreateODCFrame()
 	end
 	f:EnableMouse(true)
 	f:SetFrameStrata("DIALOG");
+	f:SetClampedToScreen(true)
 	f:SetWidth(self.config_const.frameWidth)
 	f:SetHeight(self.config_const.frameHeight)
 	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
@@ -1550,6 +1553,8 @@ local OfflineDataCenterPopMenu = {
 	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bag', true) end},
 	{text = L['Offline Bank'], 
 	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bank', true) end},
+	{text = L['Offline Character'], 
+	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('char', true) end},
 }
 
 local function DropDown(list, frame, xOffset, yOffset)
@@ -1629,6 +1634,33 @@ menuFrame:SetBackdrop({
 	insets = { left = 11, right = 12, top = 12, bottom = 11 }
 })
 
+local function CreateElvUIBagToggleButton(name, parent)
+	local f = CreateFrame('Button', nil, parent)
+	f:Height(20)
+	f:Width(20)
+	f:SetFrameLevel(f:GetFrameLevel() + 2)
+	f:SetTemplate('Default')
+	f:StyleButton()
+	f:SetNormalTexture(ODC.TabTextures[name])
+	f:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+	f:GetNormalTexture():SetInside()
+	f:CreateBackdrop("Default")
+	f.backdrop:SetAllPoints()
+	f:SetScript("OnClick", function()
+		ODC:SetActiveTab(name, true)
+	end)
+	f:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
+		GameTooltip:ClearLines()
+		GameTooltip:AddLine(ODC.TabTooltip[name])
+		GameTooltip:Show()
+	end)
+	f:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+	end)
+	return f
+end
+
 function ODC:CreateToggleButton(f)
 	if not f then return; end
 	
@@ -1654,80 +1686,14 @@ function ODC:CreateToggleButton(f)
 
 	if ElvUI and not f.offlineBagButton then
 		--offline button
-		f.offlineBagButton = CreateFrame('Button', nil, f)
-		f.offlineBagButton:Height(20)
-		f.offlineBagButton:Width(20)
+		f.offlineBagButton = CreateElvUIBagToggleButton('bag', f)
 		f.offlineBagButton:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
-		f.offlineBagButton:SetFrameLevel(f:GetFrameLevel() + 2)
-		f.offlineBagButton:SetTemplate('Default')
-		f.offlineBagButton:StyleButton()
-		f.offlineBagButton:SetNormalTexture(ODC.TabTextures['bag'])
-		f.offlineBagButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
-		f.offlineBagButton:GetNormalTexture():SetInside()
-		f.offlineBagButton:CreateBackdrop("Default")
-		f.offlineBagButton.backdrop:SetAllPoints()
-		f.offlineBagButton:SetScript("OnClick", function()
-			ODC:SetActiveTab('bag', true)
-		end)
-		f.offlineBagButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
-			GameTooltip:ClearLines()
-			GameTooltip:AddLine(L['Offline Bag'])
-			GameTooltip:Show()
-		end)
-		f.offlineBagButton:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
-		end)
-		
-		f.offlineBankButton = CreateFrame('Button', nil, f)
-		f.offlineBankButton:Height(20)
-		f.offlineBankButton:Width(20)
-		f.offlineBankButton:Point('LEFT', f.offlineBagButton, 'RIGHT', 6, 0)
-		f.offlineBankButton:SetFrameLevel(f:GetFrameLevel() + 2)
-		f.offlineBankButton:StyleButton()
-		f.offlineBankButton:SetTemplate('Default')
-		f.offlineBankButton:SetNormalTexture(ODC.TabTextures['bank'])
-		f.offlineBankButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
-		f.offlineBankButton:GetNormalTexture():SetInside()
-		f.offlineBankButton:CreateBackdrop("Default")
-		f.offlineBankButton.backdrop:SetAllPoints()
-		f.offlineBankButton:SetScript("OnClick", function()
-			ODC:SetActiveTab('bank', true)
-		end)
-		f.offlineBankButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
-			GameTooltip:ClearLines()
-			GameTooltip:AddLine(L['Offline Bank'])
-			GameTooltip:Show()
-		end)
-		f.offlineBankButton:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
-		end)
-		
-		f.offlineMailBoxButton = CreateFrame('Button', nil, f)
-		f.offlineMailBoxButton:Height(20)
-		f.offlineMailBoxButton:Width(20)
-		f.offlineMailBoxButton:Point('LEFT', f.offlineBankButton, 'RIGHT', 6, 0)
-		f.offlineMailBoxButton:SetFrameLevel(f:GetFrameLevel() + 2)
-		f.offlineMailBoxButton:SetNormalTexture(ODC.TabTextures['mail'])
-		f.offlineMailBoxButton:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
-		f.offlineMailBoxButton:GetNormalTexture():SetInside()
-		f.offlineMailBoxButton:CreateBackdrop("Default")
-		f.offlineMailBoxButton.backdrop:SetAllPoints()
-		f.offlineMailBoxButton:StyleButton()
-		f.offlineMailBoxButton:SetTemplate('Default')		
-		f.offlineMailBoxButton:SetScript("OnClick", function()
-			ODC:SetActiveTab('mail', true)
-		end)
-		f.offlineMailBoxButton:SetScript("OnEnter", function(self)
-			GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
-			GameTooltip:ClearLines()
-			GameTooltip:AddLine(L['Offline MailBox'])
-			GameTooltip:Show()
-		end)
-		f.offlineMailBoxButton:SetScript("OnLeave", function(self)
-			GameTooltip:Hide()
-		end)		
+		f.offlineBankButton = CreateElvUIBagToggleButton('bank', f)
+		f.offlineBankButton:Point("LEFT", f.offlineBagButton, "RIGHT", 6, 0)
+		f.offlineMailBoxButton = CreateElvUIBagToggleButton('mail', f)
+		f.offlineMailBoxButton:Point("LEFT", f.offlineBankButton, "RIGHT", 6, 0)
+		f.offlineCharButton = CreateElvUIBagToggleButton('char', f)
+		f.offlineCharButton:Point("LEFT", f.offlineMailBoxButton, "RIGHT", 6, 0)		
 	end
 	
 	return f

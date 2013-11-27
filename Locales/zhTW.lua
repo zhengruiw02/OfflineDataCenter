@@ -35,6 +35,7 @@ if L then
 	L['Offline MailBox'] = '離線郵箱';
 	L['Offline Bag'] = '離線背包';
 	L['Offline Bank'] = '離線銀行';	
+	L['Offline Character'] = '離線角色';
 	L['Offline Frame'] = '離線窗口';
 	
 	L['Hold down the ALT key'] = '按住Alt鍵';
