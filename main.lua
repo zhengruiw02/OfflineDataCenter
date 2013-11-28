@@ -860,7 +860,7 @@ function ODC:CreateODCFrame()
 	----Create headline
 	f.headline = f:CreateFontString(nil, 'OVERLAY');
 	if ElvUI then
-		f.headline:FontTemplate()
+		f.headline:FontTemplate(nil, 14, 'OUTLINE')
 	else
 		f.headline:SetFont(STANDARD_TEXT_FONT, 14);
 	end
@@ -894,14 +894,14 @@ function ODC:CreateODCFrame()
 	f.searchingBar:Hide();
 	f.searchingBar:SetPoint('BOTTOMLEFT', f.headline, 'BOTTOMLEFT', 0, -30);
 	if ElvUI then
-		f.searchingBar:FontTemplate()
+		f.searchingBar:FontTemplate(nil, 12, 'OUTLINE')
 	else
 		f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12);
 	end
 
 	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
 	if ElvUI then
-		f.searchingBarText:FontTemplate()
+		f.searchingBarText:FontTemplate(nil, 12, 'OUTLINE')
 	else	
 		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
 	end
@@ -950,7 +950,7 @@ function ODC:CreateODCFrame()
 	----Create mailbox gold text
 	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
 	if ElvUI then
-		f.mailboxGoldText:FontTemplate()
+		f.mailboxGoldText:FontTemplate(nil, 14, 'OUTLINE')
 	else
 		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 14);
 	end
@@ -1016,8 +1016,8 @@ function ODC:CreateODCFrame()
 		slot.count = slot:CreateFontString(nil, 'OVERLAY');
 		slot.cod = slot:CreateFontString(nil, 'OVERLAY');
 		if ElvUI then
-			slot.count:FontTemplate()
-			slot.cod:FontTemplate()
+			slot.count:FontTemplate(nil, 12, 'OUTLINE')
+			slot.cod:FontTemplate(nil, 12, 'OUTLINE')
 		else
 			slot.count:SetFont(STANDARD_TEXT_FONT, 12, 'OUTLINE');
 			slot.cod:SetFont(STANDARD_TEXT_FONT, 12, 'OUTLINE');
