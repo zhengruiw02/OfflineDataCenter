@@ -51,6 +51,263 @@ ODC.config_const = {
 	
 }
 
+local function SlotClick(self,button)----self=slot
+	local msg = self.link
+	if not msg then return; end
+	if IsShiftKeyDown() and button == 'LeftButton' then
+		if AuctionFrame and AuctionFrame:IsVisible() then
+			BrowseName:SetText(GetItemInfo(msg))
+			return;
+		end
+		if ChatFrame1EditBox:IsShown() then
+			ChatFrame1EditBox:Insert(msg);
+		else
+			local ExistMSG = ChatFrame1EditBox:GetText() or "";
+			ChatFrame1EditBox:SetText(ExistMSG..msg);
+			ChatEdit_SendText(ChatFrame1EditBox);
+			ChatFrame1EditBox:SetText("");
+			ChatFrame1EditBox:Hide();
+		end
+	elseif button == 'LeftButton' and not MB_Config.isStacked then
+		if selectTab == "mail" then
+			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
+				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
+					SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
+					StaticPopup_Show("COD_ALERT");
+				else
+					codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
+					SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
+					StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+				end
+			else
+				if self.mailIndex[1] and self.attachIndex[1] then
+					--for i = getn(self.mailIndex), 1, -1 do
+						TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
+					--end
+					ODC:Update("sort")
+				end
+			end
+		else
+			
+		end
+	end
+end
+
+local function TooltipShow(self)--self=slot
+	if selectTab ~= "mail" then 
+		if self and self.link then
+			local x = self:GetRight();
+			if ( x >= ( GetScreenWidth() / 2 ) ) then
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+			else
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			end
+			GameTooltip:SetHyperlink(self.link)
+		end
+		return
+	end
+	local mIdx, aIdx = self.mailIndex, self.attachIndex
+	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+	--local sender, wasReturned
+	if method =="money" then
+			local x = self:GetRight();
+			if ( x >= ( GetScreenWidth() / 2 ) ) then
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+			else
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			end
+		local money = MB_DB[selectChar][mIdx].money
+		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
+		local rL, gL, bL = 1, 1, 1
+		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
+		local lefttext = GetLeftTimeText(mIdx)
+		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
+		GameTooltip:Show()
+		return
+	else
+		if self and self.link then
+			local x = self:GetRight();
+			if ( x >= ( GetScreenWidth() / 2 ) ) then
+				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
+			else
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+			end
+			GameTooltip:SetHyperlink(self.link)
+		end
+	end
+	
+	local formatList = {}
+	for i = 1 , getn(mIdx) do
+		if formatList[MB_DB[selectChar][mIdx[i]].sender] == nil then
+			formatList[MB_DB[selectChar][mIdx[i]].sender] = {}
+			local row = {}
+			row.lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx[i]].sender
+			row.righttext = 0 ---summary count
+			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
+		end
+		
+		local lefttext, leftday = GetLeftTimeText(mIdx[i])
+		
+		local foundSameLefttime = false
+		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
+			if formatList[MB_DB[selectChar][mIdx[i]].sender][j].lefttext == lefttext and not MB_DB[selectChar][mIdx[i]][aIdx[i]].CODAmount and not MB_DB[selectChar][mIdx[i]][aIdx[i]].wasReturned then----!!should add cod and was returned
+				formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
+				formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
+				foundSameLefttime = true
+			end
+		end
+		
+		if foundSameLefttime == false then
+			local row = {}
+			row.lefttext = lefttext
+			row.righttext = MB_DB[selectChar][mIdx[i]][aIdx[i]].count
+			row.leftday = leftday
+			formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
+			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
+			
+			if MB_DB[selectChar][mIdx[i]].CODAmount then
+				row = {}
+				row.lefttext = "└-"..COD.." "..ITEMS
+				row.righttext = L["pay for: "]..GetCoinTextureString(MB_DB[selectChar][mIdx[i]].CODAmount)
+				row.cod = true
+				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
+			end
+			
+			if MB_DB[selectChar][mIdx[i]].wasReturned then
+				row = {}
+				row.lefttext = "└-"..L["was returned"]
+				row.righttext = ""
+				row.wasreturned = true
+				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
+			end
+		end
+		
+	end
+	
+	for k in pairs(formatList) do
+		for i = 1, getn(formatList[k]) do
+			local rL, gL, bL = 1, 1, 1
+			if i > 1 then
+				if formatList[k][i].leftday then
+					local leftday = formatList[k][i].leftday
+					if leftday < ODC.config_const.daysLeftRed then
+						rL, gL, bL = 1, 0, 0
+					elseif leftday < ODC.config_const.daysLeftYellow then
+						rL, gL, bL = 1, 1, 0
+					else
+						rL, gL, bL = 0, 1, 0
+					end
+				elseif formatList[k][i].cod then
+					rL, gL, bL = 1, 0, 0.5
+				elseif formatList[k][i].wasreturned then
+					rL, gL, bL = 1, 1, 1
+				end
+			end
+			GameTooltip:AddDoubleLine(formatList[k][i].lefttext, formatList[k][i].righttext, rL, gL, bL)
+		end
+	end
+	GameTooltip:Show()
+end
+
+--function ODC:Filter_OnClick(self)
+local function Filter_OnClick(self)
+	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, self.value);
+	ODC:Update("filter")
+end
+
+--function ODC:FilterMenuInitialize(self, level)
+local function FilterMenuInitialize(self, level)
+	--if not revSubIdxTb then return end
+	local info = UIDropDownMenu_CreateInfo();
+	info.text = ALL
+	info.value = "__all"
+	info.func = Filter_OnClick;
+	UIDropDownMenu_AddButton(info, level)
+
+	for k, v in ipairs(subIdxTb) do
+		info = UIDropDownMenu_CreateInfo()
+		local t
+		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+		if method == "quality" then
+			t = _G["ITEM_QUALITY"..v.keyword.."_DESC"]
+		elseif method == "left day" then
+			t = format("%d "..DAYS, v.keyword)
+		else
+			t = v.keyword
+		end
+		info.text = t
+		info.value = v.keyword
+		info.func = Filter_OnClick;
+		UIDropDownMenu_AddButton(info, level)
+	end
+	--if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
+		UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, "__all");
+		selectSortChanged = nil
+	--end
+end
+
+--function ODC:SortMethod_OnClick(self)
+local function SortMethod_OnClick(self)
+	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, self.value);
+	selectSortChanged = true
+	ODC:Update("sort")
+	--local text = OfflineDataCenterFrameSortDropDownText;
+	--local width = text:GetStringWidth();
+	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
+	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)	
+end
+
+--function ODC:SortMenuInitialize(self)
+local function SortMenuInitialize(self, level)
+	local info = UIDropDownMenu_CreateInfo();
+	for k, v in pairs(ODC.SelectSortMethod) do
+		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
+			info = UIDropDownMenu_CreateInfo()
+			info.text = L[k]
+			info.value = k
+			info.func = SortMethod_OnClick
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, "No sorting");
+	--local text = OfflineDataCenterFrameSortDropDownText;
+	--local width = text:GetStringWidth();
+	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
+	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)
+end
+
+local function ChooseChar_OnClick(self)
+	selectChar = self.value
+	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
+	ODC:SearchBarResetAndClear()
+	ODC:Update("sort")
+	
+	local text = OfflineDataCenterFrameChooseCharDropDownText;
+	local width = text:GetStringWidth();
+	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
+	ODC.Frame.chooseChar:SetWidth(width+60)	
+end
+
+local function ChooseCharMenuInitialize(self, level)
+	local info = UIDropDownMenu_CreateInfo();
+	for k, v in pairs(BB_DB) do
+		if type(k) == 'string' and type(v) == 'table' then
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = k
+			info.value = k
+			info.func = function(self)
+				ChooseChar_OnClick(self)
+			end;
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, selectChar);
+	local text = OfflineDataCenterFrameChooseCharDropDownText;
+	local width = text:GetStringWidth();
+	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
+	ODC.Frame.chooseChar:SetWidth(width+60)
+end
+
 function ODC:AddItemBag(itemLink, count, bagID, slotID)
 	if not BB_DB[playername][bagID] then
 		BB_DB[playername][bagID] = {}
@@ -111,6 +368,7 @@ from i, j (mailIndex, attachIndex)
 ]]
 
 function ODC:AddItemEquipped(itemLink, slotID)
+	if not IN_DB[playername][1] then IN_DB[playername][1] = {} end
 	IN_DB[playername][1][slotID] = {count = 1, itemLink = itemLink}
 end
 --[[
@@ -136,7 +394,7 @@ end
 
 function ODC:CheckBags()
 	if not BB_DB[playername] then BB_DB[playername] = {} end
-	local BagIDs = self.isBankOpened and {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} or {0, 1, 2, 3, 4}
+	local BagIDs = ODC.isBankOpened and {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} or {0, 1, 2, 3, 4}
 	local numSlots, full = GetNumBankSlots();
 	BB_DB[playername].money = GetMoney()
 	for k, bagID in pairs(BagIDs) do
@@ -693,109 +951,11 @@ end
 
 ---- GUI ----
 
---function ODC:Filter_OnClick(self)
-local function Filter_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, self.value);
-	ODC:Update("filter")
-end
-
---function ODC:FilterMenuInitialize(self)
-local function FilterMenuInitialize(self, level)
-	--if not revSubIdxTb then return end
-	local info = UIDropDownMenu_CreateInfo();
-	info = UIDropDownMenu_CreateInfo()
-	info.text = ALL
-	info.value = "__all"
-	info.func = Filter_OnClick;
-	UIDropDownMenu_AddButton(info, level)
-
-	for k, v in ipairs(subIdxTb) do
-		info = UIDropDownMenu_CreateInfo()
-		local t
-		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-		if method == "quality" then
-			t = _G["ITEM_QUALITY"..v.keyword.."_DESC"]
-		elseif method == "left day" then
-			t = format("%d "..DAYS, v.keyword)
-		else
-			t = v.keyword
-		end
-		info.text = t
-		info.value = v.keyword
-		info.func = Filter_OnClick;
-		UIDropDownMenu_AddButton(info, level)
-	end
-	--if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
-		UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, "__all");
-		selectSortChanged = nil
-	--end
-end
-
---function ODC:SortMethod_OnClick(self)
-local function SortMethod_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, self.value);
-	selectSortChanged = true
-	ODC:Update("sort")
-	--local text = OfflineDataCenterFrameSortDropDownText;
-	--local width = text:GetStringWidth();
-	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
-	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)	
-end
-
---function ODC:SortMenuInitialize(self)
-local function SortMenuInitialize(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(ODC.SelectSortMethod) do
-		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
-			info = UIDropDownMenu_CreateInfo()
-			info.text = L[k]
-			info.value = k
-			info.func = SortMethod_OnClick
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, "No sorting");
-	--local text = OfflineDataCenterFrameSortDropDownText;
-	--local width = text:GetStringWidth();
-	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
-	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)
-end
-
-local function ChooseChar_OnClick(self)
-	selectChar = self.value
-	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
-	ODC:SearchBarResetAndClear()
-	ODC:Update("sort")
-	
-	local text = OfflineDataCenterFrameChooseCharDropDownText;
-	local width = text:GetStringWidth();
-	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+60)	
-end
-
-local function ChooseCharMenuInitialize(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(BB_DB) do
-		if type(k) == 'string' and type(v) == 'table' then
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = k
-			info.value = k
-			info.func = function(self)
-				ChooseChar_OnClick(self)
-			end;
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end
-	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, selectChar);
-	local text = OfflineDataCenterFrameChooseCharDropDownText;
-	local width = text:GetStringWidth();
-	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+60)
-end
-
 function ODC:SetActiveTab(typeStr, from)
-	if not MB_Config[typeStr] then
-		print(ODC.TabTooltip[typeStr]..'is not Enabled')
+	local toggleStr = typeStr
+	if toggleStr == 'bank' then toggleStr = 'bag' end
+	if not MB_Config[toggleStr] then
+		print(ODC.TabTooltip[toggleStr]..'is not Enabled')
 		return;
 	end
 
@@ -814,9 +974,7 @@ function ODC:SetActiveTab(typeStr, from)
 	else
 		G_DB = BB_DB
 	end
-	UIDropDownMenu_Initialize(ODC.Frame.sortmethod, function(self)
-		ODC:SortMenuInitialize(self)
-	end)
+	UIDropDownMenu_Initialize(ODC.Frame.sortmethod, SortMenuInitialize)
 	--重新初始化各下拉选项框
 	--根据新的DB刷新SLOT
 	selectTab = typeStr
@@ -847,8 +1005,8 @@ local function CreateODCFrame()
 	f:EnableMouse(true)
 	f:SetFrameStrata("DIALOG");
 	f:SetClampedToScreen(true)
-	f:SetWidth(self.config_const.frameWidth)
-	f:SetHeight(self.config_const.frameHeight)
+	f:SetWidth(ODC.config_const.frameWidth)
+	f:SetHeight(ODC.config_const.frameHeight)
 	f:SetPoint(MB_Config.pa or "CENTER", MB_Config.px or 0, MB_Config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
@@ -973,11 +1131,11 @@ local function CreateODCFrame()
 	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBar", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
-	f.scrollBar:SetHeight( self.config_const.numItemsRows * self.config_const.buttonSize + (self.config_const.numItemsRows - 1) * self.config_const.buttonSpacing)
+	f.scrollBar:SetHeight( ODC.config_const.numItemsRows * ODC.config_const.buttonSize + (ODC.config_const.numItemsRows - 1) * ODC.config_const.buttonSpacing)
 	f.scrollBar:Hide()
 	--f.scrollBar:EnableMouseWheel(true)
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, self.config_const.buttonSize + self.config_const.buttonSpacing);
+		FauxScrollFrame_OnVerticalScroll(self, offset, ODC.config_const.buttonSize + ODC.config_const.buttonSpacing);
 		ODC:Update()
 	end)
 	f.scrollBar:SetScript("OnShow", function()
@@ -1006,16 +1164,16 @@ local function CreateODCFrame()
 	local numContainerRows = 0;
 	local lastButton;
 	local lastRowButton;
-	for i = 1, self.config_const.itemsSlotDisplay do
+	for i = 1, ODC.config_const.itemsSlotDisplay do
 		local slot
 		if ElvUI then
 			slot = CreateFrame('Button', nil, f.Container);
 			slot:SetTemplate('Default');
 			slot:StyleButton();
-			slot:Size(self.config_const.buttonSize);
+			slot:Size(ODC.config_const.buttonSize);
 		else
 			slot = CreateFrame('Button', nil, f.Container, "ItemButtonTemplate");
-			slot:SetSize(self.config_const.buttonSize, self.config_const.buttonSize);
+			slot:SetSize(ODC.config_const.buttonSize, ODC.config_const.buttonSize);
 		end
 		slot:Hide()
 		
@@ -1046,12 +1204,12 @@ local function CreateODCFrame()
 		f.Container[i] = slot
 		
 		if lastButton then
-			if (i - 1) % self.config_const.numItemsPerRow == 0 then
-				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -self.config_const.buttonSpacing);
+			if (i - 1) % ODC.config_const.numItemsPerRow == 0 then
+				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -ODC.config_const.buttonSpacing);
 				lastRowButton = f.Container[i];
 				numContainerRows = numContainerRows + 1;
 			else
-				slot:SetPoint('LEFT', lastButton, 'RIGHT', self.config_const.buttonSpacing, 0);
+				slot:SetPoint('LEFT', lastButton, 'RIGHT', ODC.config_const.buttonSpacing, 0);
 			end
 		else
 			slot:SetPoint('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
@@ -1104,7 +1262,7 @@ local function CreateODCFrame()
 	
 	--tab button
 	local tabIndex = 1
-	for k , v in pairs(self.TabTextures) do
+	for k , v in pairs(ODC.TabTextures) do
 		local tab = CreateFrame("CheckButton", name..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
 		tab:ClearAllPoints()
 		local texture
@@ -1297,122 +1455,6 @@ function ODC:GameTooltip_OnTooltipSetItem(TT)
 	end		
 end
 
-local function TooltipShow(self)--self=slot
-	if selectTab ~= "mail" then 
-		if self and self.link then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-			GameTooltip:SetHyperlink(self.link)
-		end
-		return
-	end
-	local mIdx, aIdx = self.mailIndex, self.attachIndex
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-	--local sender, wasReturned
-	if method =="money" then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-		local money = MB_DB[selectChar][mIdx].money
-		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
-		local rL, gL, bL = 1, 1, 1
-		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
-		local lefttext = GetLeftTimeText(mIdx)
-		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
-		GameTooltip:Show()
-		return
-	else
-		if self and self.link then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-			GameTooltip:SetHyperlink(self.link)
-		end
-	end
-	
-	local formatList = {}
-	for i = 1 , getn(mIdx) do
-		if formatList[MB_DB[selectChar][mIdx[i]].sender] == nil then
-			formatList[MB_DB[selectChar][mIdx[i]].sender] = {}
-			local row = {}
-			row.lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx[i]].sender
-			row.righttext = 0 ---summary count
-			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-		end
-		
-		local lefttext, leftday = GetLeftTimeText(mIdx[i])
-		
-		local foundSameLefttime = false
-		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
-			if formatList[MB_DB[selectChar][mIdx[i]].sender][j].lefttext == lefttext and not MB_DB[selectChar][mIdx[i]][aIdx[i]].CODAmount and not MB_DB[selectChar][mIdx[i]][aIdx[i]].wasReturned then----!!should add cod and was returned
-				formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-				formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-				foundSameLefttime = true
-			end
-		end
-		
-		if foundSameLefttime == false then
-			local row = {}
-			row.lefttext = lefttext
-			row.righttext = MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-			row.leftday = leftday
-			formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			
-			if MB_DB[selectChar][mIdx[i]].CODAmount then
-				row = {}
-				row.lefttext = "└-"..COD.." "..ITEMS
-				row.righttext = L["pay for: "]..GetCoinTextureString(MB_DB[selectChar][mIdx[i]].CODAmount)
-				row.cod = true
-				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			end
-			
-			if MB_DB[selectChar][mIdx[i]].wasReturned then
-				row = {}
-				row.lefttext = "└-"..L["was returned"]
-				row.righttext = ""
-				row.wasreturned = true
-				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			end
-		end
-		
-	end
-	
-	for k in pairs(formatList) do
-		for i = 1, getn(formatList[k]) do
-			local rL, gL, bL = 1, 1, 1
-			if i > 1 then
-				if formatList[k][i].leftday then
-					local leftday = formatList[k][i].leftday
-					if leftday < ODC.config_const.daysLeftRed then
-						rL, gL, bL = 1, 0, 0
-					elseif leftday < ODC.config_const.daysLeftYellow then
-						rL, gL, bL = 1, 1, 0
-					else
-						rL, gL, bL = 0, 1, 0
-					end
-				elseif formatList[k][i].cod then
-					rL, gL, bL = 1, 0, 0.5
-				elseif formatList[k][i].wasreturned then
-					rL, gL, bL = 1, 1, 1
-				end
-			end
-			GameTooltip:AddDoubleLine(formatList[k][i].lefttext, formatList[k][i].righttext, rL, gL, bL)
-		end
-	end
-	GameTooltip:Show()
-end
-
 StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
     text = COD_CONFIRMATION,
     button1 = ACCEPT,
@@ -1427,48 +1469,6 @@ StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
     timeout = 0,
     hideOnEscape = 1
 };
-
-local function SlotClick(self,button)----self=slot
-	local msg = self.link
-	if not msg then return; end
-	if IsShiftKeyDown() and button == 'LeftButton' then
-		if AuctionFrame and AuctionFrame:IsVisible() then
-			BrowseName:SetText(GetItemInfo(msg))
-			return;
-		end
-		if ChatFrame1EditBox:IsShown() then
-			ChatFrame1EditBox:Insert(msg);
-		else
-			local ExistMSG = ChatFrame1EditBox:GetText() or "";
-			ChatFrame1EditBox:SetText(ExistMSG..msg);
-			ChatEdit_SendText(ChatFrame1EditBox);
-			ChatFrame1EditBox:SetText("");
-			ChatFrame1EditBox:Hide();
-		end
-	elseif button == 'LeftButton' and not MB_Config.isStacked then
-		if selectTab == "mail" then
-			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
-				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
-					StaticPopup_Show("COD_ALERT");
-				else
-					codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
-					StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
-				end
-			else
-				if self.mailIndex[1] and self.attachIndex[1] then
-					--for i = getn(self.mailIndex), 1, -1 do
-						TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
-					--end
-					ODC:Update("sort")
-				end
-			end
-		else
-			
-		end
-	end
-end
 
 local function AlertDeadlineMails()
 	local DeadlineList = {__count = 0}
@@ -1709,7 +1709,7 @@ local function CreateToggleButton(f)
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('mail', f))
 		end
 		if MB_Config.inventory then
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f)
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f))
 		end
 		if #f.offlineButton > 0 then
 			for i = 1, #f.offlineButton do
@@ -1834,7 +1834,7 @@ function ODC:Toggle()
 		if OfflineDataCenterFrame then OfflineDataCenterFrame:Hide() end
 	else
 		CreateODCFrame()
-		self:SetActiveTab(activePage)
+		self:SetActiveTab('mail')
 	end
 end
 		
