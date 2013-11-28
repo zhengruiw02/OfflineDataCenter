@@ -1477,7 +1477,7 @@ local function AlertDeadlineMails()
 		--.mailCount .itemCount
 			for i = MB_DB[k].mailCount , 1, -1 do
 				local dayLeft = CalcLeftDay(k, i)
-				if dayLeft < self.config_const.daysLeftWarning then
+				if dayLeft < ODC.config_const.daysLeftWarning then
 					if not DeadlineList[k] then 
 						DeadlineList[k] = {}
 						DeadlineList.__count = DeadlineList.__count +1
@@ -1736,8 +1736,8 @@ end
 
 function ODC:BAG_UPDATE_DELAYED()
 	self:CancelAllTimers()
---	self:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
-	self:ScheduleTimer(ODC.CheckBags, 2)
+--	self:ScheduleTimer(function() self:CheckBags() end, 2)
+	self:ScheduleTimer("CheckBags", 2)
 end
 
 function ODC:BANKFRAME_OPENED()
