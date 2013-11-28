@@ -4,7 +4,7 @@
 ## Title-zhCN: 离线物品
 ## Title-zhTW: 離線物品
 ## Version: beta 3_1
-## SavedVariables: MB_DB, BB_DB, IN_DB, MB_config
+## SavedVariables: MB_DB, BB_DB, IN_DB, MB_Config
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml

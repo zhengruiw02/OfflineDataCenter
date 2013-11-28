@@ -48,6 +48,7 @@ ODC.config_const = {
 	frameWidth = 360,
 	frameHeight = 580,
 	rowcount = 8,
+	
 }
 
 function ODC:AddItemBag(itemLink, count, bagID, slotID)
@@ -187,7 +188,7 @@ function ODC:CheckMail()
 	--return true
 end
 
-function ODC:CalcLeftDay(player, mailIndex)
+local function CalcLeftDay(player, mailIndex)
 	return floor(difftime(floor(MB_DB[player][mailIndex].daysLeft * 86400) + MB_DB[player].checkMailTick,time()) / 86400)
 end
 
@@ -374,7 +375,7 @@ ODC.SelectSortMethod = {
 		self:InsertToIndexTable(sender, mailIndex, attachIndex)	
 	end,--mailbox only
 	["left day"] = function(self, mailIndex, attachIndex)
-		local leftday = self:CalcLeftDay(selectChar, mailIndex)
+		local leftday = CalcLeftDay(selectChar, mailIndex)
 		self:InsertToIndexTable(leftday, mailIndex, attachIndex, "left day")
 	end,--mailbox only
 	["C.O.D."] = function(self, mailIndex, attachIndex)
@@ -419,7 +420,7 @@ revSubIdxTb{	["a"] 		=	1
 ]]
 --build filter menu base on subType!
 
-function ODC:SummingForQuality(slotdb)
+local function SummingForQuality(slotdb)
 	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
 	if not mailIndex or not attachIndex or not selectChar then return end
 	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[selectChar][mailIndex][attachIndex].itemLink)
@@ -443,18 +444,18 @@ slotDB{		[1]		.mailIndex
 
 function ODC:SubFilter(i, c)
 	for j = 1, getn(subIdxTb[i]) do
-		if not MB_config.isStacked then
+		if not MB_Config.isStacked then
 			for k = 1, getn(subIdxTb[i][j]) do
 				c = c + 1
 				slotDB[c] = {}
 				slotDB[c][1] = subIdxTb[i][j][k]--??
-				self:SummingForQuality(slotDB[c][1])
+				SummingForQuality(slotDB[c][1])
 			end
 		else
 			c = c + 1
 			slotDB[c] = subIdxTb[i][j]
 			for k = 1, getn(subIdxTb[i][j]) do
-				self:SummingForQuality(subIdxTb[i][j][k])
+				SummingForQuality(subIdxTb[i][j][k])
 			end
 		end
 	end
@@ -542,9 +543,11 @@ function ODC:SortDB()
 		end
 	end
 	if revSubIdxTb.__count == 0 then slotDB = nil; return end
-	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, function(self)
-		ODC:FilterMenuInitialize(self)
-	end)
+--	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, function(self)
+--		ODC:FilterMenuInitialize(self)
+--	end)
+	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, FilterMenuInitialize)
+	
 	self:Filter()
 end
 
@@ -690,20 +693,20 @@ end
 
 ---- GUI ----
 
-function ODC:Filter_OnClick(self)
+--function ODC:Filter_OnClick(self)
+local function Filter_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, self.value);
 	ODC:Update("filter")
 end
 
-function ODC:FilterMenuInitialize(self)
+--function ODC:FilterMenuInitialize(self)
+local function FilterMenuInitialize(self, level)
 	--if not revSubIdxTb then return end
 	local info = UIDropDownMenu_CreateInfo();
 	info = UIDropDownMenu_CreateInfo()
 	info.text = ALL
 	info.value = "__all"
-	info.func = function(self)
-		ODC:Filter_OnClick(self)
-	end;
+	info.func = Filter_OnClick;
 	UIDropDownMenu_AddButton(info, level)
 
 	for k, v in ipairs(subIdxTb) do
@@ -719,9 +722,7 @@ function ODC:FilterMenuInitialize(self)
 		end
 		info.text = t
 		info.value = v.keyword
-		info.func = function(self)
-			ODC:Filter_OnClick(self)
-		end;
+		info.func = Filter_OnClick;
 		UIDropDownMenu_AddButton(info, level)
 	end
 	--if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
@@ -730,7 +731,8 @@ function ODC:FilterMenuInitialize(self)
 	--end
 end
 
-function ODC:SortMethod_OnClick(self)
+--function ODC:SortMethod_OnClick(self)
+local function SortMethod_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, self.value);
 	selectSortChanged = true
 	ODC:Update("sort")
@@ -740,16 +742,15 @@ function ODC:SortMethod_OnClick(self)
 	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)	
 end
 
-function ODC:SortMenuInitialize(self)
+--function ODC:SortMenuInitialize(self)
+local function SortMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(ODC.SelectSortMethod) do
 		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L[k]
 			info.value = k
-			info.func = function(self)
-				ODC:SortMethod_OnClick(self)
-			end;
+			info.func = SortMethod_OnClick
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
@@ -793,6 +794,11 @@ local function ChooseCharMenuInitialize(self, level)
 end
 
 function ODC:SetActiveTab(typeStr, from)
+	if not MB_Config[typeStr] then
+		print(ODC.TabTooltip[typeStr]..'is not Enabled')
+		return;
+	end
+
 	for k, v in pairs(ODC.TabTooltip) do
 		if k == typeStr then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(true)
@@ -823,7 +829,7 @@ function ODC:SetActiveTab(typeStr, from)
 	
 end
 	
-function ODC:CreateODCFrame()
+local function CreateODCFrame()
 	----Create ODC bank frame
 	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
 	ODC.Frame = f
@@ -843,7 +849,7 @@ function ODC:CreateODCFrame()
 	f:SetClampedToScreen(true)
 	f:SetWidth(self.config_const.frameWidth)
 	f:SetHeight(self.config_const.frameHeight)
-	f:SetPoint(MB_config.pa or "CENTER", MB_config.px or 0, MB_config.py or 0)
+	f:SetPoint(MB_Config.pa or "CENTER", MB_Config.px or 0, MB_Config.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", function(self)
@@ -851,7 +857,7 @@ function ODC:CreateODCFrame()
 	end)
 	f:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		MB_config.p, MB_config.pf, MB_config.pa, MB_config.px, MB_config.py = self:GetPoint()
+		MB_Config.p, MB_Config.pf, MB_Config.pa, MB_Config.px, MB_Config.py = self:GetPoint()
 	end)
 	f:Hide()
 	
@@ -931,9 +937,9 @@ function ODC:CreateODCFrame()
 	f.stackUpCheckButton = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate");
 	f.stackUpCheckButton:SetPoint("LEFT",f.searchingBar, 200, 0)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
-	f.stackUpCheckButton:SetChecked(MB_config.isStacked or false)
+	f.stackUpCheckButton:SetChecked(MB_Config.isStacked or false)
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
-		MB_config.isStacked = self:GetChecked()
+		MB_Config.isStacked = self:GetChecked()
 		ODC:Update("filter")
 	end)
 
@@ -1031,12 +1037,8 @@ function ODC:CreateODCFrame()
 		slot.tex:SetPoint("TOPLEFT", slot, "TOPLEFT", 2, -2)
 		slot.tex:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
 		slot.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-		slot:SetScript("OnEnter", function(self)
-			ODC:TooltipShow(self)----???
-		end)
-		slot:HookScript("OnClick", function(self,button)
-			ODC:SlotClick(self,button)----???
-		end)
+		slot:SetScript("OnEnter", TooltipShow)
+		slot:HookScript("OnClick", SlotClick)
 		slot:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
@@ -1095,10 +1097,10 @@ function ODC:CreateODCFrame()
 --		ODC:ChooseCharMenuInitialize(self)
 --	end)
 	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
-	
-	UIDropDownMenu_Initialize(f.sortmethod, function(self)
-		ODC:SortMenuInitialize(self)
-	end)
+	UIDropDownMenu_Initialize(f.sortmethod, SortMenuInitialize)
+--	UIDropDownMenu_Initialize(f.sortmethod, function(self)
+--		ODC:SortMenuInitialize(self)
+--	end)
 	
 	--tab button
 	local tabIndex = 1
@@ -1210,7 +1212,7 @@ slotDB{		[1]		.mailIndex
 							.money?
 							.daysLeft!
 ]]
-function ODC:GetLeftTimeText(mailIndex)
+local function GetLeftTimeText(mailIndex)
 	local lefttext = L["+ Left time: "]
 	local dayLeftTick = difftime(floor(MB_DB[selectChar][mailIndex].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
 	local leftday = floor(dayLeftTick / 86400)
@@ -1231,15 +1233,15 @@ function ODC:GameTooltip_OnTooltipCleared(TT)
 	TT.ItemCleared = nil
 end
 
-function ODC:AddItemTooltip(characterName, count, found)
-	if not found[characterName] then
-		found[characterName] = 0
+local function AddItemTooltip(characterName, count, FoundDB)
+	if not FoundDB[characterName] then
+		FoundDB[characterName] = 0
 	end
-	found[characterName] = found[characterName] + count
+	FoundDB[characterName] = FoundDB[characterName] + count
 end
 
-function ODC:LookupSameItem(itemID)
-	local Found = {}
+local function LookupSameItem(itemID)
+	local FoundDB = {}
 	local BagIDs = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
 	for char, BB_Table in pairs(BB_DB) do --assume all character has this db
 		if type(char) == 'string' and type(BB_Table) == 'table' then
@@ -1248,7 +1250,7 @@ function ODC:LookupSameItem(itemID)
 					for j = 1, BB_Table[bag].slotMAX do
 						if BB_Table[bag][j] then
 							if GetItemID(BB_Table[bag][j].itemLink) == itemID then
-								self:AddItemTooltip(char, BB_Table[bag][j].count, Found)
+								AddItemTooltip(char, BB_Table[bag][j].count, FoundDB)
 							end
 						end
 					end
@@ -1263,7 +1265,7 @@ function ODC:LookupSameItem(itemID)
 					for j, MB_subTable in pairs(MB_Table[i]) do
 						if type(MB_subTable) == "table" then
 							if GetItemID(MB_subTable.itemLink) == itemID then
-								self:AddItemTooltip(char, MB_subTable.count, Found)
+								AddItemTooltip(char, MB_subTable.count, FoundDB)
 							end
 						end
 					end
@@ -1271,7 +1273,7 @@ function ODC:LookupSameItem(itemID)
 			end
 		end
 	end
-	return Found
+	return FoundDB
 end
 
 function ODC:GameTooltip_OnTooltipSetItem(TT)
@@ -1283,8 +1285,8 @@ function ODC:GameTooltip_OnTooltipSetItem(TT)
 		local item, link = TT:GetItem()
 		if IsAltKeyDown() and link ~= nil then
 			local itemID = GetItemID(link)
-			local Found = self:LookupSameItem(itemID)
-			for k, v in pairs(Found) do
+			local FoundDB = LookupSameItem(itemID)
+			for k, v in pairs(FoundDB) do
 				TT:AddDoubleLine('|cFFCA3C3C'..k..'|r', v)
 			end
 		else
@@ -1295,7 +1297,7 @@ function ODC:GameTooltip_OnTooltipSetItem(TT)
 	end		
 end
 
-function ODC:TooltipShow(self)--self=slot
+local function TooltipShow(self)--self=slot
 	if selectTab ~= "mail" then 
 		if self and self.link then
 			local x = self:GetRight();
@@ -1322,7 +1324,7 @@ function ODC:TooltipShow(self)--self=slot
 		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
 		local rL, gL, bL = 1, 1, 1
 		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
-		local lefttext = ODC:GetLeftTimeText(mIdx)
+		local lefttext = GetLeftTimeText(mIdx)
 		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
 		GameTooltip:Show()
 		return
@@ -1348,7 +1350,7 @@ function ODC:TooltipShow(self)--self=slot
 			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
 		end
 		
-		local lefttext, leftday = ODC:GetLeftTimeText(mIdx[i])
+		local lefttext, leftday = GetLeftTimeText(mIdx[i])
 		
 		local foundSameLefttime = false
 		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
@@ -1426,7 +1428,7 @@ StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
     hideOnEscape = 1
 };
 
-function ODC:SlotClick(self,button)----self=slot
+local function SlotClick(self,button)----self=slot
 	local msg = self.link
 	if not msg then return; end
 	if IsShiftKeyDown() and button == 'LeftButton' then
@@ -1443,7 +1445,7 @@ function ODC:SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' and not MB_config.isStacked then
+	elseif button == 'LeftButton' and not MB_Config.isStacked then
 		if selectTab == "mail" then
 			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
 				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
@@ -1468,13 +1470,13 @@ function ODC:SlotClick(self,button)----self=slot
 	end
 end
 
-function ODC:AlertDeadlineMails()
+local function AlertDeadlineMails()
 	local DeadlineList = {__count = 0}
 	for k, v in pairs(MB_DB) do
 		if type(k) == 'string' and type(v) == 'table' then
 		--.mailCount .itemCount
 			for i = MB_DB[k].mailCount , 1, -1 do
-				local dayLeft = self:CalcLeftDay(k, i)
+				local dayLeft = CalcLeftDay(k, i)
 				if dayLeft < self.config_const.daysLeftWarning then
 					if not DeadlineList[k] then 
 						DeadlineList[k] = {}
@@ -1541,9 +1543,9 @@ function ODC:HookSendMail(recipient, subject, body)
 	end
 end
 
-function ODC:BagUpdateDelayed()
-	self:CheckBags()
-end
+--function ODC:BagUpdateDelayed()
+--	self:CheckBags()
+--end
 
 function ODC:FrameShow()
 	-- self:UpdateContainer()
@@ -1553,7 +1555,9 @@ end
 function ODC:FrameHide()
 	self.Frame:Hide()
 	self:SearchBarResetAndClear()
-	collectgarbage("collect")
+	if not InCombatLockdown() then
+		collectgarbage("collect")
+	end
 end
 
 local OfflineDataCenterPopMenu = {
@@ -1564,7 +1568,7 @@ local OfflineDataCenterPopMenu = {
 	{text = L['Offline Bank'], 
 	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bank', true) end},
 	{text = L['Offline Character'], 
-	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('char', true) end},
+	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('inventory', true) end},
 }
 
 local function DropDown(list, frame, xOffset, yOffset)
@@ -1671,7 +1675,7 @@ local function CreateElvUIBagToggleButton(name, parent)
 	return f
 end
 
-function ODC:CreateToggleButton(f)
+local function CreateToggleButton(f)
 	if not f then return; end
 	
 	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
@@ -1694,16 +1698,28 @@ function ODC:CreateToggleButton(f)
 		return ContainerFrame1PortraitButton
 	end
 
-	if ElvUI and not f.offlineBagButton then
+	if ElvUI and not f.offlineButton then
+		f.offlineButton = {}
 		--offline button
-		f.offlineBagButton = CreateElvUIBagToggleButton('bag', f)
-		f.offlineBagButton:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
-		f.offlineBankButton = CreateElvUIBagToggleButton('bank', f)
-		f.offlineBankButton:Point("LEFT", f.offlineBagButton, "RIGHT", 6, 0)
-		f.offlineMailBoxButton = CreateElvUIBagToggleButton('mail', f)
-		f.offlineMailBoxButton:Point("LEFT", f.offlineBankButton, "RIGHT", 6, 0)
-		f.offlineCharButton = CreateElvUIBagToggleButton('char', f)
-		f.offlineCharButton:Point("LEFT", f.offlineMailBoxButton, "RIGHT", 6, 0)		
+		if MB_Config.bag then
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bag', f))
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bank', f))
+		end
+		if MB_Config.mail then
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton('mail', f))
+		end
+		if MB_Config.inventory then
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f)
+		end
+		if #f.offlineButton > 0 then
+			for i = 1, #f.offlineButton do
+				if i == 1 then
+					f.offlineButton[i]:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
+				else
+					f.offlineButton[i]:Point("LEFT", f.offlineButton[i-1], "RIGHT", 6, 0)
+				end
+			end
+		end		
 	end
 	
 	return f
@@ -1720,7 +1736,8 @@ end
 
 function ODC:BAG_UPDATE_DELAYED()
 	self:CancelAllTimers()
-	self:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
+--	self:ScheduleTimer(function() self:BagUpdateDelayed() end, 2)
+	self:ScheduleTimer(ODC.CheckBags, 2)
 end
 
 function ODC:BANKFRAME_OPENED()
@@ -1755,12 +1772,80 @@ function ODC:REPLACE_ENCHANT()
 end
 
 function ODC:OpenBags()
-	self:CreateToggleButton(ElvUI_ContainerFrame)
-	self:CreateToggleButton(ContainerFrame1)
+	CreateToggleButton(ElvUI_ContainerFrame)
+	CreateToggleButton(ContainerFrame1)
 end
 
+function ODC:Toggle()
+	local tabNumber = 0
+	local activePage = ''
+	self:UnhookAll()
+	if MB_Config.bag then
+		self:RegisterEvent("BAG_UPDATE_DELAYED")
+		self:RegisterEvent("BANKFRAME_OPENED")
+		self:RegisterEvent("BANKFRAME_CLOSED")		
+		self:SecureHook('OpenAllBags', 'OpenBags');
+		self:SecureHook('ToggleBag', 'OpenBags');
+		ODC.TabTextures["bag"] = "Interface\\Buttons\\Button-Backpack-Up"
+		ODC.TabTextures["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp"
+		tabNumber = tabNumber + 1
+		activePage = 'bag'
+		if OfflineDataCenterFramebagTab then OfflineDataCenterFramebagTab:SetAlpha(1) end
+	else
+		self:UnregisterEvent("BAG_UPDATE_DELAYED")
+		self:UnregisterEvent("BANKFRAME_OPENED")
+		self:UnregisterEvent("BANKFRAME_CLOSED")	
+		ODC.TabTextures['bag'] = nil;
+		ODC.TabTextures['bank'] = nil;
+		if OfflineDataCenterFramebagTab then OfflineDataCenterFramebagTab:SetAlpha(0) end
+	end
+	if MB_Config.inventory then
+		self:RegisterEvent("UNIT_INVENTORY_CHANGED");
+		self:RegisterEvent("REPLACE_ENCHANT");
+		self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
+		ODC.TabTextures["inventory"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp"
+		tabNumber = tabNumber + 1
+		activePage = 'inventory'
+		if OfflineDataCenterFrameinventoryTab then OfflineDataCenterFrameinventoryTab:SetAlpha(1) end
+	else
+		self:UnregisterEvent("UNIT_INVENTORY_CHANGED");
+		self:UnregisterEvent("REPLACE_ENCHANT");
+		self:UnregisterEvent("ITEM_UPGRADE_MASTER_UPDATE");	
+		ODC.TabTextures["inventory"] = nil;
+		if OfflineDataCenterFrameinventoryTab then OfflineDataCenterFrameinventoryTab:SetAlpha(0) end
+	end
+	if MB_Config.mail then
+		self:RegisterEvent("MAIL_SHOW")
+		self:RegisterEvent("MAIL_CLOSED")	
+		self:RegisterEvent("MAIL_INBOX_UPDATE")
+		self:SecureHook('SendMail', 'HookSendMail');
+		ODC.TabTextures["mail"] = "Interface\\MailFrame\\Mail-Icon.blp"
+		tabNumber = tabNumber + 1
+		activePage = 'mail'
+		if OfflineDataCenterFramemailTab then OfflineDataCenterFramemailTab:SetAlpha(1) end
+	else
+		self:UnregisterEvent("MAIL_SHOW")
+		self:UnregisterEvent("MAIL_CLOSED")	
+		self:UnregisterEvent("MAIL_INBOX_UPDATE")
+		ODC.TabTextures["mail"] = nil;
+		if OfflineDataCenterFramemailTab then OfflineDataCenterFramemailTab:SetAlpha(0) end
+	end
+	if tabNumber == 0 then 
+		if OfflineDataCenterFrame then OfflineDataCenterFrame:Hide() end
+	else
+		CreateODCFrame()
+		self:SetActiveTab(activePage)
+	end
+end
+		
 function ODC:OnInitialize()
-	if MB_config == nil then MB_config = {} end
+	if MB_Config == nil then
+		MB_Config = {
+			['mail'] = true,
+			['bag'] = true,
+			['inventory'] = true,
+		}
+	end
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
 	if not IN_DB then IN_DB = {} end
@@ -1768,30 +1853,22 @@ function ODC:OnInitialize()
 	if not BB_DB[playername] then BB_DB[playername] = {} end
 	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
 	if not IN_DB[playername] then self:CheckEquipped() end
-	self:RegisterEvent("MAIL_INBOX_UPDATE")
-	self:RegisterEvent("BAG_UPDATE_DELAYED")
-	self:RegisterEvent("BANKFRAME_OPENED")
-	self:RegisterEvent("BANKFRAME_CLOSED")
-	self:RegisterEvent("UNIT_INVENTORY_CHANGED");
-	self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
-	self:RegisterEvent("REPLACE_ENCHANT");
-	self:SecureHook('OpenAllBags', 'OpenBags');
-	self:SecureHook('ToggleBag', 'OpenBags');
+	
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
-	self:RegisterEvent("MAIL_SHOW")
-	self:RegisterEvent("MAIL_CLOSED")
+	
+	self:Toggle()
 	--[[if self.config_const == nil then
 		self.config_const = {}
 		for k ,v in pairs(self.config_init) do
 			self.config_const[k] = v;
 		end
 	end]]
-	self:CreateODCFrame()
-	self:SetActiveTab('mail')
 	
-	self:AlertDeadlineMails()
-	hooksecurefunc("SendMail", function() self:HookSendMail() end)
+	if MB_Config.mail then
+		AlertDeadlineMails()
+	end
+--	hooksecurefunc("SendMail", function() self:HookSendMail() end)
 	self.isBankOpened = nil
 end
 ---- Slash command ----
