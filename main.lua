@@ -1259,41 +1259,49 @@ local function CreateODCFrame()
 --	UIDropDownMenu_Initialize(f.sortmethod, function(self)
 --		ODC:SortMenuInitialize(self)
 --	end)
-	
+end
+
+local function CreateFrameTab(f)
 	--tab button
 	local tabIndex = 1
 	for k , v in pairs(ODC.TabTextures) do
-		local tab = CreateFrame("CheckButton", name..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
-		tab:ClearAllPoints()
-		local texture
-		if ElvUI then
-			--local S = ElvUI[1]:GetModule("Skins")
-			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
-			tab:DisableDrawLayer("BACKGROUND")
-			tab:SetNormalTexture(v)
-			tab:GetNormalTexture():ClearAllPoints()
-			tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
-			tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
-			tab:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
-
-			tab:CreateBackdrop("Default")
-			tab.backdrop:SetAllPoints()
-			tab:StyleButton()
+		if not MB_Config[k] then
+			if _G[f:GetName()..k..'Tab'] then
+				_G[f:GetName()..k..'Tab']:Hide()
+				_G[f:GetName()..k..'Tab'] = nil
+			end
 		else
-			tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, (-48 * tabIndex) + 18)
-			tab:SetNormalTexture(v)
-		end	
-		tabIndex = tabIndex + 1
-		tab:SetAttribute("type", "spell")
-		tab:SetAttribute("spell", name)
-		tab.typeStr = k
-		tab:SetScript("OnClick", function(self)
-			ODC:SetActiveTab(self.typeStr)
-		end)
-		
-		tab.name = name
-		tab.tooltip = ODC.TabTooltip[k]
-		tab:Show()
+			local tab = _G[f:GetName()..k..'Tab'] or CreateFrame("CheckButton", f:GetName()..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
+			tab:ClearAllPoints()
+			if ElvUI then
+				--local S = ElvUI[1]:GetModule("Skins")
+				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
+				tab:DisableDrawLayer("BACKGROUND")
+				tab:SetNormalTexture(v)
+				tab:GetNormalTexture():ClearAllPoints()
+				tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
+				tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
+				tab:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+				tab:CreateBackdrop("Default")
+				tab.backdrop:SetAllPoints()
+				tab:StyleButton()
+			else
+				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, (-48 * tabIndex) + 18)
+				tab:SetNormalTexture(v)
+			end	
+			tabIndex = tabIndex + 1
+			tab:SetAttribute("type", "spell")
+			tab:SetAttribute("spell", f:GetName())
+			tab.typeStr = k
+			tab:SetScript("OnClick", function(self)
+				ODC:SetActiveTab(self.typeStr)
+			end)
+			
+			tab.name = name
+			tab.tooltip = ODC.TabTooltip[k]
+			tab:Show()
+		end
 	end
 end
 
@@ -1786,55 +1794,42 @@ function ODC:Toggle()
 		self:RegisterEvent("BANKFRAME_CLOSED")		
 		self:SecureHook('OpenAllBags', 'OpenBags');
 		self:SecureHook('ToggleBag', 'OpenBags');
-		ODC.TabTextures["bag"] = "Interface\\Buttons\\Button-Backpack-Up"
-		ODC.TabTextures["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp"
 		tabNumber = tabNumber + 1
 		activePage = 'bag'
-		if OfflineDataCenterFramebagTab then OfflineDataCenterFramebagTab:SetAlpha(1) end
 	else
 		self:UnregisterEvent("BAG_UPDATE_DELAYED")
 		self:UnregisterEvent("BANKFRAME_OPENED")
 		self:UnregisterEvent("BANKFRAME_CLOSED")	
-		ODC.TabTextures['bag'] = nil;
-		ODC.TabTextures['bank'] = nil;
-		if OfflineDataCenterFramebagTab then OfflineDataCenterFramebagTab:SetAlpha(0) end
 	end
 	if MB_Config.inventory then
 		self:RegisterEvent("UNIT_INVENTORY_CHANGED");
 		self:RegisterEvent("REPLACE_ENCHANT");
 		self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
-		ODC.TabTextures["inventory"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp"
 		tabNumber = tabNumber + 1
 		activePage = 'inventory'
-		if OfflineDataCenterFrameinventoryTab then OfflineDataCenterFrameinventoryTab:SetAlpha(1) end
 	else
 		self:UnregisterEvent("UNIT_INVENTORY_CHANGED");
 		self:UnregisterEvent("REPLACE_ENCHANT");
 		self:UnregisterEvent("ITEM_UPGRADE_MASTER_UPDATE");	
-		ODC.TabTextures["inventory"] = nil;
-		if OfflineDataCenterFrameinventoryTab then OfflineDataCenterFrameinventoryTab:SetAlpha(0) end
 	end
 	if MB_Config.mail then
 		self:RegisterEvent("MAIL_SHOW")
 		self:RegisterEvent("MAIL_CLOSED")	
 		self:RegisterEvent("MAIL_INBOX_UPDATE")
 		self:SecureHook('SendMail', 'HookSendMail');
-		ODC.TabTextures["mail"] = "Interface\\MailFrame\\Mail-Icon.blp"
 		tabNumber = tabNumber + 1
 		activePage = 'mail'
-		if OfflineDataCenterFramemailTab then OfflineDataCenterFramemailTab:SetAlpha(1) end
 	else
 		self:UnregisterEvent("MAIL_SHOW")
 		self:UnregisterEvent("MAIL_CLOSED")	
 		self:UnregisterEvent("MAIL_INBOX_UPDATE")
-		ODC.TabTextures["mail"] = nil;
-		if OfflineDataCenterFramemailTab then OfflineDataCenterFramemailTab:SetAlpha(0) end
 	end
 	if tabNumber == 0 then 
 		if OfflineDataCenterFrame then OfflineDataCenterFrame:Hide() end
 	else
 		CreateODCFrame()
-		self:SetActiveTab('mail')
+		CreateFrameTab(ODC.Frame)
+		self:SetActiveTab(activePage)
 	end
 end
 		
