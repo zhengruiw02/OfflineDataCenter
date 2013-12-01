@@ -19,7 +19,6 @@ local selectTab
 local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
-local isInCombat
 ODC.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
 	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
@@ -45,6 +44,7 @@ ODC.config_const = {
 	frameWidth = 360,
 	frameHeight = 580,
 	rowcount = 8,
+	
 }
 
 local function SlotClick(self,button)----self=slot
@@ -1677,7 +1677,10 @@ end
 
 local function CreateToggleButton(f)
 	if not f then return; end
-	if isInCombat then return end
+	if InCombatLockdown() then
+		print(L["In Combating, Offline Data Center Toggle button can not created, please leave the combat after retry"]);
+		return;
+	end
 	
 	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
 		ContainerFrame1PortraitButton:RegisterForClicks('AnyUp', 'AnyDown')
@@ -1728,14 +1731,6 @@ end
 
 ---- Event ----
 
-function ODC:PLAYER_REGEN_ENABLED()
-	isInCombat = nil
-end
-
-function ODC:PLAYER_REGEN_DISABLED()
-	isInCombat = true
-end
-
 function ODC:MAIL_INBOX_UPDATE()
 	self:CheckMail()
 	if self.Frame:IsVisible() and selectChar == playername and selectTab == "mail" then
@@ -1761,14 +1756,12 @@ function ODC:BANKFRAME_CLOSED()
 end
 
 function ODC:MAIL_SHOW()
-	--self.isMailOpened = true
 	-- if not self.Frame:IsVisible() then 
 		-- self:FrameShow();
 	-- end
 end
 
 function ODC:MAIL_CLOSED()
-	--self.isMailOpened = true
 	-- self:FrameHide()
 end
 
@@ -1885,8 +1878,7 @@ function ODC:OnInitialize()
 			self.config_const[k] = v;
 		end
 	end]]
-	self:RegisterEvent("PLAYER_REGEN_DISABLED")
-	self:RegisterEvent("PLAYER_REGEN_ENABLED")
+	
 	if MB_Config.toggle.mail then
 		AlertDeadlineMails()
 	end
