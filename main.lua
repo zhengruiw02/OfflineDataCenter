@@ -1685,6 +1685,10 @@ end
 
 local function CreateToggleButton(f)
 	if not f then return; end
+	if InCombatLockdown() then
+		print(L["In Combating, Offline Data Center Toggle button can not created, please leave the combat after retry"]);
+		return;
+	end
 	
 	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
 		ContainerFrame1PortraitButton:RegisterForClicks('AnyUp', 'AnyDown')
