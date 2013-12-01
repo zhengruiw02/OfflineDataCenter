@@ -982,7 +982,7 @@ local function CreateODCFrame()
 	----Create ODC bank frame
 	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
 	ODC.Frame = f
-	if MB_Config.UI == nil then MB_Config.UI = {}
+	if MB_Config.UI == nil then MB_Config.UI = {} end
 	
 	if ElvUI then
 		f:SetTemplate(ElvUI[1].db.bags.transparent and "notrans" or "Transparent")
