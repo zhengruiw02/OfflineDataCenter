@@ -16,9 +16,10 @@ local len, sub, find, format, match = string.len, string.sub, string.find, strin
 local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectChar = playername
 local selectTab
-local slotDB, subIdxTb, revSubIdxTb, sumQuality
+local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
+local isInCombat
 ODC.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
 	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
@@ -31,10 +32,6 @@ ODC.TabTooltip = {
 	["mail"] = L['Offline MailBox'],
 	["inventory"] = L['Offline Character'],
 }
---local ODC = CreateFrame("Frame", nil , UIParent)
-local G_DB
-
-ODC.isMailboxOnly = false
 
 ODC.config_const = {
 	daysLeftYellow = 7,
@@ -48,7 +45,6 @@ ODC.config_const = {
 	frameWidth = 360,
 	frameHeight = 580,
 	rowcount = 8,
-	
 }
 
 local function SlotClick(self,button)----self=slot
@@ -68,7 +64,7 @@ local function SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' and not MB_Config.isStacked then
+	elseif button == 'LeftButton' and not MB_Config.UI.isStacked then
 		if selectTab == "mail" then
 			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
 				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
@@ -702,7 +698,7 @@ slotDB{		[1]		.mailIndex
 
 function ODC:SubFilter(i, c)
 	for j = 1, getn(subIdxTb[i]) do
-		if not MB_Config.isStacked then
+		if not MB_Config.UI.isStacked then
 			for k = 1, getn(subIdxTb[i][j]) do
 				c = c + 1
 				slotDB[c] = {}
@@ -801,11 +797,7 @@ function ODC:SortDB()
 		end
 	end
 	if revSubIdxTb.__count == 0 then slotDB = nil; return end
---	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, function(self)
---		ODC:FilterMenuInitialize(self)
---	end)
 	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, FilterMenuInitialize)
-	
 	self:Filter()
 end
 
@@ -895,7 +887,6 @@ slotDB{		[1]		.mailIndex
 			end
 			--local mailIndex, attachIndex = slotDB[itemIndex].mailIndex, slotDB[itemIndex].attachIndex--!!!!
 			--slot.data = slotDB[itemIndex]
-			--slot.tex:SetTexture(GetCoinIcon(money))
 			slot.link = G_DB[selectChar][slot.mailIndex[1]][slot.attachIndex[1]].itemLink
 			if slot.link then
 				slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
@@ -953,16 +944,16 @@ end
 
 function ODC:SetActiveTab(typeStr, from)
 	local toggleStr = typeStr
-	if toggleStr == 'bank' then toggleStr = 'bag' end
-	if not MB_Config[toggleStr] then
-		print(ODC.TabTooltip[toggleStr]..'is not Enabled')
+	--if toggleStr == 'bank' then toggleStr = 'bag' end
+	if not MB_Config.toggle[typeStr] then
+		print(ODC.TabTooltip[typeStr]..'is not Enabled')
 		return;
 	end
 
-	for k, v in pairs(ODC.TabTooltip) do
+	for k, v in pairs(MB_Config.toggle) do
 		if k == typeStr then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(true)
-		else
+		elseif v then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(false)
 		end
 	end
@@ -991,6 +982,7 @@ local function CreateODCFrame()
 	----Create ODC bank frame
 	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
 	ODC.Frame = f
+	if MB_Config.UI = nil then MB_Config.UI = {}
 	
 	if ElvUI then
 		f:SetTemplate(ElvUI[1].db.bags.transparent and "notrans" or "Transparent")
@@ -1007,7 +999,7 @@ local function CreateODCFrame()
 	f:SetClampedToScreen(true)
 	f:SetWidth(ODC.config_const.frameWidth)
 	f:SetHeight(ODC.config_const.frameHeight)
-	f:SetPoint(MB_Config.pa or "CENTER", MB_Config.px or 0, MB_Config.py or 0)
+	f:SetPoint(MB_Config.UI.pa or "CENTER", MB_Config.UI.px or 0, MB_Config.UI.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", function(self)
@@ -1015,7 +1007,7 @@ local function CreateODCFrame()
 	end)
 	f:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		MB_Config.p, MB_Config.pf, MB_Config.pa, MB_Config.px, MB_Config.py = self:GetPoint()
+		MB_Config.UI.p, MB_Config.UI.pf, MB_Config.UI.pa, MB_Config.UI.px, MB_Config.UI.py = self:GetPoint()
 	end)
 	f:Hide()
 	
@@ -1095,9 +1087,9 @@ local function CreateODCFrame()
 	f.stackUpCheckButton = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate");
 	f.stackUpCheckButton:SetPoint("LEFT",f.searchingBar, 200, 0)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
-	f.stackUpCheckButton:SetChecked(MB_Config.isStacked or false)
+	f.stackUpCheckButton:SetChecked(MB_Config.UI.isStacked or false)
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
-		MB_Config.isStacked = self:GetChecked()
+		MB_Config.UI.isStacked = self:GetChecked()
 		ODC:Update("filter")
 	end)
 
@@ -1265,7 +1257,7 @@ local function CreateFrameTab(f)
 	--tab button
 	local tabIndex = 1
 	for k , v in pairs(ODC.TabTextures) do
-		if not MB_Config[k] then
+		if not MB_Config.toggle[k] then
 			if _G[f:GetName()..k..'Tab'] then
 				_G[f:GetName()..k..'Tab']:Hide()
 				_G[f:GetName()..k..'Tab'] = nil
@@ -1685,6 +1677,7 @@ end
 
 local function CreateToggleButton(f)
 	if not f then return; end
+	if isInCombat then return end
 	
 	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
 		ContainerFrame1PortraitButton:RegisterForClicks('AnyUp', 'AnyDown')
@@ -1709,14 +1702,14 @@ local function CreateToggleButton(f)
 	if ElvUI and not f.offlineButton then
 		f.offlineButton = {}
 		--offline button
-		if MB_Config.bag then
+		if MB_Config.toggle.bag then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bag', f))
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bank', f))
 		end
-		if MB_Config.mail then
+		if MB_Config.toggle.mail then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('mail', f))
 		end
-		if MB_Config.inventory then
+		if MB_Config.toggle.inventory then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f))
 		end
 		if #f.offlineButton > 0 then
@@ -1735,6 +1728,14 @@ end
 
 ---- Event ----
 
+function ODC:PLAYER_REGEN_ENABLED()
+	isInCombat = nil
+end
+
+function ODC:PLAYER_REGEN_DISABLED()
+	isInCombat = true
+end
+
 function ODC:MAIL_INBOX_UPDATE()
 	self:CheckMail()
 	if self.Frame:IsVisible() and selectChar == playername and selectTab == "mail" then
@@ -1744,8 +1745,10 @@ end
 
 function ODC:BAG_UPDATE_DELAYED()
 	self:CancelAllTimers()
---	self:ScheduleTimer(function() self:CheckBags() end, 2)
 	self:ScheduleTimer("CheckBags", 2)
+	if self.Frame:IsVisible() and selectChar == playername and (selectTab == "bag" or selectTab == "bank") then
+		self:ScheduleTimer("Update", 2, "sort")
+	end
 end
 
 function ODC:BANKFRAME_OPENED()
@@ -1758,25 +1761,36 @@ function ODC:BANKFRAME_CLOSED()
 end
 
 function ODC:MAIL_SHOW()
+	--self.isMailOpened = true
 	-- if not self.Frame:IsVisible() then 
 		-- self:FrameShow();
 	-- end
 end
 
 function ODC:MAIL_CLOSED()
+	--self.isMailOpened = true
 	-- self:FrameHide()
 end
 
 function ODC:UNIT_INVENTORY_CHANGED()
 	self:CheckEquipped()
+	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
+		self:Update("sort")
+	end
 end
 
 function ODC:ITEM_UPGRADE_MASTER_UPDATE()
 	self:CheckEquipped()
+	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
+		self:Update("sort")
+	end
 end
 
 function ODC:REPLACE_ENCHANT()
 	self:CheckEquipped()
+	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
+		self:Update("sort")
+	end
 end
 
 function ODC:OpenBags()
@@ -1785,23 +1799,41 @@ function ODC:OpenBags()
 end
 
 function ODC:Toggle()
+	if MB_Config.toggle == nil then
+		MB_Config.toggle = {
+			['mail'] = true,
+			['bag'] = true,
+			['bank'] = true,
+			['inventory'] = true,
+		}
+	end
 	local tabNumber = 0
 	local activePage = ''
 	self:UnhookAll()
-	if MB_Config.bag then
-		self:RegisterEvent("BAG_UPDATE_DELAYED")
-		self:RegisterEvent("BANKFRAME_OPENED")
-		self:RegisterEvent("BANKFRAME_CLOSED")		
-		self:SecureHook('OpenAllBags', 'OpenBags');
-		self:SecureHook('ToggleBag', 'OpenBags');
+	if MB_Config.toggle.bag then
 		tabNumber = tabNumber + 1
 		activePage = 'bag'
+		MB_Config.toggle.bank = true
 	else
-		self:UnregisterEvent("BAG_UPDATE_DELAYED")
+		MB_Config.toggle.bank = false
+	end
+	if MB_Config.toggle.bank then
+		self:RegisterEvent("BANKFRAME_OPENED")
+		self:RegisterEvent("BANKFRAME_CLOSED")		
+		tabNumber = tabNumber + 1
+		activePage = 'bank'
+	else
 		self:UnregisterEvent("BANKFRAME_OPENED")
 		self:UnregisterEvent("BANKFRAME_CLOSED")	
 	end
-	if MB_Config.inventory then
+	if MB_Config.toggle.bag or MB_Config.toggle.bank then
+		self:RegisterEvent("BAG_UPDATE_DELAYED")	
+		self:SecureHook('OpenAllBags', 'OpenBags');
+		self:SecureHook('ToggleBag', 'OpenBags');
+	else
+		self:UnregisterEvent("BAG_UPDATE_DELAYED")
+	end
+	if MB_Config.toggle.inventory then
 		self:RegisterEvent("UNIT_INVENTORY_CHANGED");
 		self:RegisterEvent("REPLACE_ENCHANT");
 		self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
@@ -1812,7 +1844,7 @@ function ODC:Toggle()
 		self:UnregisterEvent("REPLACE_ENCHANT");
 		self:UnregisterEvent("ITEM_UPGRADE_MASTER_UPDATE");	
 	end
-	if MB_Config.mail then
+	if MB_Config.toggle.mail then
 		self:RegisterEvent("MAIL_SHOW")
 		self:RegisterEvent("MAIL_CLOSED")	
 		self:RegisterEvent("MAIL_INBOX_UPDATE")
@@ -1834,13 +1866,7 @@ function ODC:Toggle()
 end
 		
 function ODC:OnInitialize()
-	if MB_Config == nil then
-		MB_Config = {
-			['mail'] = true,
-			['bag'] = true,
-			['inventory'] = true,
-		}
-	end
+	if MB_Config == nil then MB_Config = {UI = {}} end
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
 	if not IN_DB then IN_DB = {} end
@@ -1859,8 +1885,9 @@ function ODC:OnInitialize()
 			self.config_const[k] = v;
 		end
 	end]]
-	
-	if MB_Config.mail then
+	self:RegisterEvent("PLAYER_REGEN_DISABLED")
+	self:RegisterEvent("PLAYER_REGEN_ENABLED")
+	if MB_Config.toggle.mail then
 		AlertDeadlineMails()
 	end
 --	hooksecurefunc("SendMail", function() self:HookSendMail() end)
