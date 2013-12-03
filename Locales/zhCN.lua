@@ -41,5 +41,5 @@ if L then
 	L['Hold down the ALT key'] = '按住Alt键';
 	L['Show the number of items for all Character'] = '显示所有角色的物品数量';
 	
-	L["In Combating, Offline Data Center Toggle button can not created, please leave the combat after retry"] = '战斗时, 离线背包开关按钮不能被创建, 请脱战后重试.';
+	L["Offline Data Center toggle button can not be created in Combating, please leave the combat before retry!"] = '战斗时, 离线背包开关按钮不能被创建, 请脱战后重试.';
 end

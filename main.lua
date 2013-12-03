@@ -1,14 +1,12 @@
 --@@ TODO: solve COD item, maybe displaying COD amount above the slot icon or using tool-tip
 	--UC..don't know how to layout in tool-tip..
---@@ TODO: change frame's layout!
-	--holy shit..
 --@@ TODO: should stacked attachments can be collect??
 	--UC.. new window to produce? or pop-up ? COD to collect?
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. to optimize
 
 --@@ TODO: optimize & combine same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
-local ODC = LibStub("AceAddon-3.0"):NewAddon("OfflineDataCenter", "AceHook-3.0", "AceEvent-3.0", "AceTimer-3.0")
+local ODC = LibStub("AceAddon-3.0"):NewAddon("OfflineDataCenter", "AceHook-3.0", "AceEvent-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
@@ -16,10 +14,18 @@ local len, sub, find, format, match = string.len, string.sub, string.find, strin
 local playername = GetUnitName("player")..'-'..GetRealmName()
 local selectChar = playername
 local selectTab
+
 local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
 local codMoney, codMailIndex, codAttachmentIndex
-ODC.TabTextures = {
+
+ODC.module = {}
+ODC.TabTextures = {}
+ODC.TabTooltip = {}
+ODC.playername = playername
+ODC.selectChar = selectChar
+ODC.selectTab = selectTab
+--[[ODC.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
 	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
 	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
@@ -30,7 +36,7 @@ ODC.TabTooltip = {
 	["bank"] = L['Offline Bank'], 
 	["mail"] = L['Offline MailBox'],
 	["inventory"] = L['Offline Character'],
-}
+}]]
 
 ODC.config_const = {
 	daysLeftYellow = 7,
@@ -302,144 +308,6 @@ local function ChooseCharMenuInitialize(self, level)
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
 	ODC.Frame.chooseChar:SetWidth(width+60)
-end
-
-function ODC:AddItemBag(itemLink, count, bagID, slotID)
-	if not BB_DB[playername][bagID] then
-		BB_DB[playername][bagID] = {}
-	end
-	BB_DB[playername][bagID][slotID] = {count = count, itemLink = itemLink}
-end
---[[
-BB_DB structure:
-				bagID		slotID
-[charName] = {	[1]			[1]			{	.count
-				[n]			.slotMAX		.itemLink
-				.itemCountBank
-				.itemCountBag
-]]
-function ODC:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
-	if recipient and firstItem then
-		local t ={}
-		tinsert(MB_DB[recipient], 1, t)
-	elseif not recipient then
-		recipient = playername
-	end
-	
-	if not MB_DB[recipient][mailIndex] or firstItem then
-		MB_DB[recipient][mailIndex] = {
-			sender = sender,
-			daysLeft = daysLeft,
-			wasReturned = wasReturned,
-			money = (money > 0) and money or nil,
-			CODAmount = (CODAmount > 0) and CODAmount or nil,}
-		MB_DB[recipient].mailCount = MB_DB[recipient].mailCount + 1
-	end
-	
-	if not itemLink then return end --for money only
-	MB_DB[recipient][mailIndex][attachIndex] = {
-		count = count,
-		itemLink = itemLink,}
-	MB_DB[recipient].itemCount = MB_DB[recipient].itemCount + 1
-end
---[[
-new structure:
-				mailIndex	attachIndex
-[charName] = {	[1]			[1]			{	.count
-				[n]			.sender			.itemLink
-				.daysLeft 	.wasReturned
-				.mailCount	.CODAmount?
-				.itemCount	.money?
-enum:
-for i = 1, getn(mailIndex) do
-	curr.sender, curr.daysLeft, curr.wasReturned, curr.CODAmount
-	for j = 1, ATTACHMENTS_MAX_RECEIVE do
-		if MB_DB[charName].i.j then
-			
-		end
-	end
-end
-get position(sortDB, filter, updateContainer):
-from i, j (mailIndex, attachIndex)
-]]
-
-function ODC:AddItemEquipped(itemLink, slotID)
-	if not IN_DB[playername][1] then IN_DB[playername][1] = {} end
-	IN_DB[playername][1][slotID] = {count = 1, itemLink = itemLink}
-end
---[[
-IN_DB structure:
-							INVSLOT
-[charName] = {	[1]		{	[1]			{	.count
-							[2]				.itemLink
-				["stat"]{	.stat1
-							.statN
-]]
-function ODC:CheckEquipped()
-	if not IN_DB[playername] then
-		IN_DB[playername] = {}
-		IN_DB[playername][1] = {}
-	end
-	for slotID = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-		local link = GetInventoryItemLink("player", slotID);
-		if link then
-			self:AddItemEquipped(link, slotID)
-		end
-	end
-end
-
-function ODC:CheckBags()
-	if not BB_DB[playername] then BB_DB[playername] = {} end
-	local BagIDs = ODC.isBankOpened and {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} or {0, 1, 2, 3, 4}
-	local numSlots, full = GetNumBankSlots();
-	BB_DB[playername].money = GetMoney()
-	for k, bagID in pairs(BagIDs) do
-		local numSlots = GetContainerNumSlots(bagID)
-		if numSlots > 0 then
-			BB_DB[playername][bagID] = {slotMAX = numSlots}
-			local inbagItemCount = 0
-			for slotIndex = 1, numSlots do
-				local itemLink = GetContainerItemLink(bagID, slotIndex)
-				if itemLink then
-					local _, count, _, _, _ = GetContainerItemInfo(bagID, slotIndex)
-					self:AddItemBag(itemLink, count, bagID, slotIndex)
-					inbagItemCount = inbagItemCount + 1
-				end
-			end
-			BB_DB[playername][bagID].inbagItemCount = inbagItemCount
-		end
-	end
-end
-
-function ODC:CheckMail()
-	MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0}
-	local numItems, totalItems = GetInboxNumItems()
-	if numItems and numItems > 0 then
-		for mailIndex = 1, numItems do
-			--local packageIcon, stationeryIcon, sender, subject, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, textCreated, canReply, isGM = GetInboxHeaderInfo(mailIndex);
-			local _, _, sender, _, money, CODAmount, daysLeft, hasItem, wasRead, wasReturned, _, _, _ = GetInboxHeaderInfo(mailIndex);
-			--if isGM ~= nil then print("GM@"..sender) end
-			if money > 0 then
-				MB_DB[playername].money = MB_DB[playername].money + money
-			end
-			--self:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
-			self:AddItemMail(nil, nil, mailIndex, nil, sender, daysLeft, money, CODAmount, wasReturned)
-			if hasItem then
-				if sender == nil then
-					sender = L["UNKNOWN SENDER"]
-				end
-				for attachIndex = 1, ATTACHMENTS_MAX_RECEIVE do
-					local itemLink = GetInboxItemLink(mailIndex, attachIndex)
-					if itemLink then
-						local _, _, count, _, _ = GetInboxItem(mailIndex, attachIndex)
-						self:AddItemMail(itemLink, count, mailIndex, attachIndex)
-					end
-				end
-			end
-		end
-	end
-	MB_DB[playername].checkMailTick = time()
-	--return true
 end
 
 local function CalcLeftDay(player, mailIndex)
@@ -979,7 +847,7 @@ function ODC:SetActiveTab(typeStr, from)
 end
 	
 local function CreateODCFrame()
-	----Create ODC bank frame
+	----Create ODC frame
 	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
 	ODC.Frame = f
 	if MB_Config.UI == nil then MB_Config.UI = {} end
@@ -1243,14 +1111,8 @@ local function CreateODCFrame()
 		ODC:Update()
 	end)
 	
---	UIDropDownMenu_Initialize(f.chooseChar, function(self)
---		ODC:ChooseCharMenuInitialize(self)
---	end)
 	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
 	UIDropDownMenu_Initialize(f.sortmethod, SortMenuInitialize)
---	UIDropDownMenu_Initialize(f.sortmethod, function(self)
---		ODC:SortMenuInitialize(self)
---	end)
 end
 
 local function CreateFrameTab(f)
@@ -1470,83 +1332,6 @@ StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
     hideOnEscape = 1
 };
 
-local function AlertDeadlineMails()
-	local DeadlineList = {__count = 0}
-	for k, v in pairs(MB_DB) do
-		if type(k) == 'string' and type(v) == 'table' then
-		--.mailCount .itemCount
-			for i = MB_DB[k].mailCount , 1, -1 do
-				local dayLeft = CalcLeftDay(k, i)
-				if dayLeft < ODC.config_const.daysLeftWarning then
-					if not DeadlineList[k] then 
-						DeadlineList[k] = {}
-						DeadlineList.__count = DeadlineList.__count +1
-					end
-					for j, u in pairs(MB_DB[k][i]) do
-						if type(u) == "table" then
-							tinsert(DeadlineList[k], u.itemLink)
-						end
-					end
-				--else--because of cod items' deadline is 3 days !!
-					--break
-				end
-			end
-		end
-	end
-	if DeadlineList.__count > 0 then
-		local alertText = L["Offline Data Center"] .. L[": |cff00aabbYou have mails soon expire: |r"]
-		for k, t in pairs(DeadlineList) do
-			if k ~= "__count" then
-				alertText = alertText.."\r\n\[".. k .. "\]: "
-				for i, v in pairs(t) do
-					alertText = alertText .. v
-				end
-			end
-		end
-		print(alertText)
-	end
-end
-
-function ODC:HookSendMail(recipient, subject, body)
-	if not recipient then recipient = SendMailNameEditBox:GetText() end
-	if not recipient then return end
-	recipient = string.upper(string.sub(recipient, 1, 1))..string.sub(recipient, 2, -1)
-	for k, v in pairs(MB_DB) do
-		if type(k) == 'string' and type(v) == 'table' then
-			if recipient..'-'..GetRealmName() == k then
-				local Getmoney = GetSendMailMoney()
-				local Sendmoney, Codmoney = 0, 0
-				if Getmoney then
-					if SendMailSendMoneyButton:GetChecked() then
-						Sendmoney = Getmoney
-						MB_DB[recipient..'-'..GetRealmName()].money = MB_DB[recipient..'-'..GetRealmName()].money + Sendmoney
-					else
-						Codmoney = Getmoney
-					end
-				end
-				local firstItem = true
-				for i = ATTACHMENTS_MAX_RECEIVE, 1, -1 do
-					local Name, _, count, _ = GetSendMailItem(i)
-					if Name then
-						local _, itemLink, _, _, _, _, _, _, _, _, _ = GetItemInfo(Name or "")
-						--self:AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
-						self:AddItemMail(itemLink, count, 1, i, GetUnitName("player"), 31, Sendmoney, Codmoney, nil, k, firstItem)
-						firstItem = nil
-					end
-				end
-				if self.Frame:IsVisible() and selectChar == k then
-					self:Update("sort")
-				end
-				return
-			end
-		end
-	end
-end
-
---function ODC:BagUpdateDelayed()
---	self:CheckBags()
---end
-
 function ODC:FrameShow()
 	-- self:UpdateContainer()
 	self.Frame:Show()
@@ -1555,6 +1340,7 @@ end
 function ODC:FrameHide()
 	self.Frame:Hide()
 	self:SearchBarResetAndClear()
+	MB_Config.UI.activePage = selectTab
 	if not InCombatLockdown() then
 		collectgarbage("collect")
 	end
@@ -1678,7 +1464,7 @@ end
 local function CreateToggleButton(f)
 	if not f then return; end
 	if InCombatLockdown() then
-		print(L["In Combating, Offline Data Center Toggle button can not created, please leave the combat after retry"]);
+		print(L["Offline Data Center toggle button can not be created in Combating, please leave the combat before retry!"]);
 		return;
 	end
 	
@@ -1731,59 +1517,33 @@ end
 
 ---- Event ----
 
-function ODC:MAIL_INBOX_UPDATE()
-	self:CheckMail()
-	if self.Frame:IsVisible() and selectChar == playername and selectTab == "mail" then
-		self:Update("sort")
+function ODC:AddModule(module)
+	for k, v in pairs(module.TabTextures) do
+		self.TabTextures[k] = v
 	end
-end
-
-function ODC:BAG_UPDATE_DELAYED()
-	self:CancelAllTimers()
-	self:ScheduleTimer("CheckBags", 2)
-	if self.Frame:IsVisible() and selectChar == playername and (selectTab == "bag" or selectTab == "bank") then
-		self:ScheduleTimer("Update", 2, "sort")
+	for k, v in pairs(module.TabTooltip) do
+		self.TabTooltip[k] = v
 	end
+	CreateFrameTab(ODC.Frame)
+	--self:SetActiveTab(selectTab)
 end
 
-function ODC:BANKFRAME_OPENED()
-	self.isBankOpened = true
-	self:CheckBags()
-end
-
-function ODC:BANKFRAME_CLOSED()
-	self.isBankOpened = nil
-end
-
-function ODC:MAIL_SHOW()
-	-- if not self.Frame:IsVisible() then 
-		-- self:FrameShow();
-	-- end
-end
-
-function ODC:MAIL_CLOSED()
-	-- self:FrameHide()
-end
-
-function ODC:UNIT_INVENTORY_CHANGED()
-	self:CheckEquipped()
-	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
-		self:Update("sort")
+function ODC:RemoveModule(module)
+	for k, v in pairs(module.TabTextures) do
+		self.TabTextures[k] = nil
 	end
+	for k, v in pairs(module.TabTooltip) do
+		self.TabTooltip[k] = nil
+	end
+	CreateFrameTab(ODC.Frame)
 end
 
-function ODC:ITEM_UPGRADE_MASTER_UPDATE()
-	self:CheckEquipped()
-	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
-		self:Update("sort")
-	end
+function ODC:AddFeed(name, func)
+
 end
 
-function ODC:REPLACE_ENCHANT()
-	self:CheckEquipped()
-	if self.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
-		self:Update("sort")
-	end
+function ODC:RemoveFeed(name, func)
+
 end
 
 function ODC:OpenBags()
@@ -1793,6 +1553,7 @@ end
 
 function ODC:Toggle()
 	if MB_Config.toggle == nil then
+		print("toggled")
 		MB_Config.toggle = {
 			['mail'] = true,
 			['bag'] = true,
@@ -1801,99 +1562,50 @@ function ODC:Toggle()
 		}
 	end
 	local tabNumber = 0
-	local activePage = ''
-	self:UnhookAll()
-	if MB_Config.toggle.bag then
+	selectTab = MB_Config.UI.activePage
+	for k, v in pairs(MB_Config.toggle) do
 		tabNumber = tabNumber + 1
-		activePage = 'bag'
-		MB_Config.toggle.bank = true
-	else
-		MB_Config.toggle.bank = false
+		if not selectTab then
+			selectTab = k
+		end
 	end
-	if MB_Config.toggle.bank then
-		self:RegisterEvent("BANKFRAME_OPENED")
-		self:RegisterEvent("BANKFRAME_CLOSED")		
-		tabNumber = tabNumber + 1
-		activePage = 'bank'
-	else
-		self:UnregisterEvent("BANKFRAME_OPENED")
-		self:UnregisterEvent("BANKFRAME_CLOSED")	
-	end
-	if MB_Config.toggle.bag or MB_Config.toggle.bank then
-		self:RegisterEvent("BAG_UPDATE_DELAYED")	
-		self:SecureHook('OpenAllBags', 'OpenBags');
-		self:SecureHook('ToggleBag', 'OpenBags');
-	else
-		self:UnregisterEvent("BAG_UPDATE_DELAYED")
-	end
-	if MB_Config.toggle.inventory then
-		self:RegisterEvent("UNIT_INVENTORY_CHANGED");
-		self:RegisterEvent("REPLACE_ENCHANT");
-		self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
-		tabNumber = tabNumber + 1
-		activePage = 'inventory'
-	else
-		self:UnregisterEvent("UNIT_INVENTORY_CHANGED");
-		self:UnregisterEvent("REPLACE_ENCHANT");
-		self:UnregisterEvent("ITEM_UPGRADE_MASTER_UPDATE");	
-	end
-	if MB_Config.toggle.mail then
-		self:RegisterEvent("MAIL_SHOW")
-		self:RegisterEvent("MAIL_CLOSED")	
-		self:RegisterEvent("MAIL_INBOX_UPDATE")
-		self:SecureHook('SendMail', 'HookSendMail');
-		tabNumber = tabNumber + 1
-		activePage = 'mail'
-	else
-		self:UnregisterEvent("MAIL_SHOW")
-		self:UnregisterEvent("MAIL_CLOSED")	
-		self:UnregisterEvent("MAIL_INBOX_UPDATE")
-	end
+
 	if tabNumber == 0 then 
 		if OfflineDataCenterFrame then OfflineDataCenterFrame:Hide() end
 	else
 		CreateODCFrame()
-		CreateFrameTab(ODC.Frame)
-		self:SetActiveTab(activePage)
+		--CreateFrameTab(ODC.Frame)
+		--self:SetActiveTab(selectTab)
 	end
 end
 		
 function ODC:OnInitialize()
 	if MB_Config == nil then MB_Config = {UI = {}} end
-	if not MB_DB then MB_DB = {} end
-	if not BB_DB then BB_DB = {} end
-	if not IN_DB then IN_DB = {} end
-	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
-	if not BB_DB[playername] then BB_DB[playername] = {} end
-	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	if not IN_DB[playername] then self:CheckEquipped() end
-	
+	if MB_Config.UI == nil then MB_Config.UI = {} end
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	
-	self:Toggle()
-	--[[if self.config_const == nil then
-		self.config_const = {}
-		for k ,v in pairs(self.config_init) do
-			self.config_const[k] = v;
-		end
-	end]]
+	--self:Toggle()
+	CreateODCFrame()
+	if not MB_DB then MB_DB = {} end
+	if not BB_DB then BB_DB = {} end
+	if not IN_DB then IN_DB = {} end
 	
-	if MB_Config.toggle.mail then
-		AlertDeadlineMails()
-	end
---	hooksecurefunc("SendMail", function() self:HookSendMail() end)
-	self.isBankOpened = nil
-end
----- Slash command ----
+	-- if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
+	-- if not BB_DB[playername] then BB_DB[playername] = {} end
+	-- if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
+	-- if not IN_DB[playername] then self:CheckEquipped() end
+	
+	---- Slash command ----
 
-SLASH_MAILBOXBANK1 = "/mb";
-SLASH_MAILBOXBANK2 = "/mailbox";
-SlashCmdList["MAILBOXBANK"] = function()
-	if ODC.Frame:IsVisible() then
-		ODC:FrameHide()
-	else
-		ODC:Update("sort")
-		ODC:FrameShow()
-	end
-end;
+	SLASH_OFFLINEDATACENTER1 = "/mb";
+	SLASH_OFFLINEDATACENTER2 = "/odc";
+	SlashCmdList["OFFLINEDATACENTER"] = function()
+		if self.Frame:IsVisible() then
+			self:FrameHide()
+		else
+			self:Update("sort")
+			self:FrameShow()
+		end
+	end;	
+end
