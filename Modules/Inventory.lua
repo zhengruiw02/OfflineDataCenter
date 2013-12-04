@@ -1,7 +1,10 @@
 local ODC = LibStub("AceAddon-3.0"):GetAddon("OfflineDataCenter")
+local ODC_SF = ODC:GetModule("SortFilter")
+if not ODC_SF then return end
 local ODC_Inventory = ODC:NewModule("OfflineInventory", "AceEvent-3.0", "AceHook-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 ODC_Inventory.description = L["Offline Character"]
+ODC_Inventory.type = "tab"
 
 ODC_Inventory.TabTextures = {
 	["inventory"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp",
@@ -12,7 +15,6 @@ ODC_Inventory.TabTooltip = {
 }
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
---local MB_Config, IN_DB = ODC.MB_Config, ODC.IN_DB
 
 local function AddItemEquipped(itemLink, slotID)
 	IN_DB[playername][1][slotID] = {count = 1, itemLink = itemLink}
@@ -38,7 +40,7 @@ function ODC_Inventory:CheckEquipped()
 	end
 	
 	if ODC.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
-		ODC:Update("sort")
+		ODC_SF:Update("sort")
 	end
 end
 
@@ -54,9 +56,20 @@ function ODC_Inventory:REPLACE_ENCHANT()
 	self:CheckEquipped()
 end
 
+local SelectTabFunc = function()
+	ODC_SF:UpdateSortMenu()
+	ODC_SF:Update("sort")
+end
+
+local SelectCharFunc = function()
+	ODC_SF:Update("sort")
+end
+
 function ODC_Inventory:OnEnable()
 	MB_Config.toggle.inventory = true
 	ODC:AddModule(self)
+	ODC:AddFunc("inventory", "selectTab", SelectTabFunc)
+	ODC:AddFunc("inventory", "selectChar", SelectCharFunc)
 	if not IN_DB[playername] then self:CheckEquipped() end
 	self:RegisterEvent("UNIT_INVENTORY_CHANGED");
 	self:RegisterEvent("REPLACE_ENCHANT");
@@ -66,6 +79,8 @@ end
 function ODC_Inventory:OnDisable()
 	MB_Config.toggle.inventory = false
 	ODC:RemoveModule(self)
+	ODC:RemoveFunc("inventory", "selectTab")
+	ODC:RemoveFunc("inventory", "selectTab")
 	-- self:UnregisterEvent("UNIT_INVENTORY_CHANGED");
 	-- self:UnregisterEvent("REPLACE_ENCHANT");
 	-- self:UnregisterEvent("ITEM_UPGRADE_MASTER_UPDATE");	

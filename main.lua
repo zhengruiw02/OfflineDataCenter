@@ -11,278 +11,28 @@ local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 local getn, tinsert = table.getn, table.insert
 local floor = math.floor
 local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
-local playername = GetUnitName("player")..'-'..GetRealmName()
-local selectChar = playername
-local selectTab
-
-local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
-local selectSortChanged
-local codMoney, codMailIndex, codAttachmentIndex
+ODC.playername = GetUnitName("player")..'-'..GetRealmName()
+ODC.selectChar = ODC.playername
+ODC.selectTab = nil
 
 ODC.module = {}
 ODC.TabTextures = {}
 ODC.TabTooltip = {}
-ODC.playername = playername
-ODC.selectChar = selectChar
-ODC.selectTab = selectTab
---[[ODC.TabTextures = {
-	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
-	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
-	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
-	["inventory"] = "INTERFACE\\CHARACTERFRAME\\TempPortrait.blp",
-}
-ODC.TabTooltip = {
-	["bag"] = L['Offline Bag'], 
-	["bank"] = L['Offline Bank'], 
-	["mail"] = L['Offline MailBox'],
-	["inventory"] = L['Offline Character'],
-}]]
+ODC.PopupMenu = {}
+ODC.TabChangedFunc = {}
+ODC.CharChangedFunc = {}
+
 
 ODC.config_const = {
-	daysLeftYellow = 7,
-	daysLeftRed = 3,
-	daysLeftWarning = 5,
-	buttonSize = 36,
-	buttonSpacing = 4,
-	numItemsPerRow = 8,
-	numItemsRows = 11,
-	itemsSlotDisplay = 88,
 	frameWidth = 360,
 	frameHeight = 580,
-	rowcount = 8,
-	
 }
 
-local function SlotClick(self,button)----self=slot
-	local msg = self.link
-	if not msg then return; end
-	if IsShiftKeyDown() and button == 'LeftButton' then
-		if AuctionFrame and AuctionFrame:IsVisible() then
-			BrowseName:SetText(GetItemInfo(msg))
-			return;
-		end
-		if ChatFrame1EditBox:IsShown() then
-			ChatFrame1EditBox:Insert(msg);
-		else
-			local ExistMSG = ChatFrame1EditBox:GetText() or "";
-			ChatFrame1EditBox:SetText(ExistMSG..msg);
-			ChatEdit_SendText(ChatFrame1EditBox);
-			ChatFrame1EditBox:SetText("");
-			ChatFrame1EditBox:Hide();
-		end
-	elseif button == 'LeftButton' and not MB_Config.UI.isStacked then
-		if selectTab == "mail" then
-			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
-				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
-					StaticPopup_Show("COD_ALERT");
-				else
-					codMoney, codMailIndex, codAttachmentIndex = MB_DB[selectChar][self.mailIndex[1]].CODAmount, self.mailIndex[1], self.attachIndex[1]
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
-					StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
-				end
-			else
-				if self.mailIndex[1] and self.attachIndex[1] then
-					--for i = getn(self.mailIndex), 1, -1 do
-						TakeInboxItem(self.mailIndex[1], self.attachIndex[1])
-					--end
-					ODC:Update("sort")
-				end
-			end
-		else
-			
-		end
-	end
-end
-
-local function TooltipShow(self)--self=slot
-	if selectTab ~= "mail" then 
-		if self and self.link then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-			GameTooltip:SetHyperlink(self.link)
-		end
-		return
-	end
-	local mIdx, aIdx = self.mailIndex, self.attachIndex
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-	--local sender, wasReturned
-	if method =="money" then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-		local money = MB_DB[selectChar][mIdx].money
-		local lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx].sender
-		local rL, gL, bL = 1, 1, 1
-		GameTooltip:AddDoubleLine(lefttext, GetCoinTextureString(money),rL, gL, bL)
-		local lefttext = GetLeftTimeText(mIdx)
-		GameTooltip:AddDoubleLine(lefttext, "", rL, gL, bL)
-		GameTooltip:Show()
-		return
-	else
-		if self and self.link then
-			local x = self:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
-			end
-			GameTooltip:SetHyperlink(self.link)
-		end
-	end
-	
-	local formatList = {}
-	for i = 1 , getn(mIdx) do
-		if formatList[MB_DB[selectChar][mIdx[i]].sender] == nil then
-			formatList[MB_DB[selectChar][mIdx[i]].sender] = {}
-			local row = {}
-			row.lefttext = L["Sender: "] ..MB_DB[selectChar][mIdx[i]].sender
-			row.righttext = 0 ---summary count
-			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-		end
-		
-		local lefttext, leftday = GetLeftTimeText(mIdx[i])
-		
-		local foundSameLefttime = false
-		for j = 1, getn(formatList[MB_DB[selectChar][mIdx[i]].sender]) do
-			if formatList[MB_DB[selectChar][mIdx[i]].sender][j].lefttext == lefttext and not MB_DB[selectChar][mIdx[i]][aIdx[i]].CODAmount and not MB_DB[selectChar][mIdx[i]][aIdx[i]].wasReturned then----!!should add cod and was returned
-				formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][j].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-				formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-				foundSameLefttime = true
-			end
-		end
-		
-		if foundSameLefttime == false then
-			local row = {}
-			row.lefttext = lefttext
-			row.righttext = MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-			row.leftday = leftday
-			formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext = formatList[MB_DB[selectChar][mIdx[i]].sender][1].righttext + MB_DB[selectChar][mIdx[i]][aIdx[i]].count
-			tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			
-			if MB_DB[selectChar][mIdx[i]].CODAmount then
-				row = {}
-				row.lefttext = "└-"..COD.." "..ITEMS
-				row.righttext = L["pay for: "]..GetCoinTextureString(MB_DB[selectChar][mIdx[i]].CODAmount)
-				row.cod = true
-				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			end
-			
-			if MB_DB[selectChar][mIdx[i]].wasReturned then
-				row = {}
-				row.lefttext = "└-"..L["was returned"]
-				row.righttext = ""
-				row.wasreturned = true
-				tinsert(formatList[MB_DB[selectChar][mIdx[i]].sender], row)
-			end
-		end
-		
-	end
-	
-	for k in pairs(formatList) do
-		for i = 1, getn(formatList[k]) do
-			local rL, gL, bL = 1, 1, 1
-			if i > 1 then
-				if formatList[k][i].leftday then
-					local leftday = formatList[k][i].leftday
-					if leftday < ODC.config_const.daysLeftRed then
-						rL, gL, bL = 1, 0, 0
-					elseif leftday < ODC.config_const.daysLeftYellow then
-						rL, gL, bL = 1, 1, 0
-					else
-						rL, gL, bL = 0, 1, 0
-					end
-				elseif formatList[k][i].cod then
-					rL, gL, bL = 1, 0, 0.5
-				elseif formatList[k][i].wasreturned then
-					rL, gL, bL = 1, 1, 1
-				end
-			end
-			GameTooltip:AddDoubleLine(formatList[k][i].lefttext, formatList[k][i].righttext, rL, gL, bL)
-		end
-	end
-	GameTooltip:Show()
-end
-
---function ODC:Filter_OnClick(self)
-local function Filter_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, self.value);
-	ODC:Update("filter")
-end
-
---function ODC:FilterMenuInitialize(self, level)
-local function FilterMenuInitialize(self, level)
-	--if not revSubIdxTb then return end
-	local info = UIDropDownMenu_CreateInfo();
-	info.text = ALL
-	info.value = "__all"
-	info.func = Filter_OnClick;
-	UIDropDownMenu_AddButton(info, level)
-
-	for k, v in ipairs(subIdxTb) do
-		info = UIDropDownMenu_CreateInfo()
-		local t
-		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-		if method == "quality" then
-			t = _G["ITEM_QUALITY"..v.keyword.."_DESC"]
-		elseif method == "left day" then
-			t = format("%d "..DAYS, v.keyword)
-		else
-			t = v.keyword
-		end
-		info.text = t
-		info.value = v.keyword
-		info.func = Filter_OnClick;
-		UIDropDownMenu_AddButton(info, level)
-	end
-	--if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
-		UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, "__all");
-		selectSortChanged = nil
-	--end
-end
-
---function ODC:SortMethod_OnClick(self)
-local function SortMethod_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, self.value);
-	selectSortChanged = true
-	ODC:Update("sort")
-	--local text = OfflineDataCenterFrameSortDropDownText;
-	--local width = text:GetStringWidth();
-	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
-	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)	
-end
-
---function ODC:SortMenuInitialize(self)
-local function SortMenuInitialize(self, level)
-	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(ODC.SelectSortMethod) do
-		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
-			info = UIDropDownMenu_CreateInfo()
-			info.text = L[k]
-			info.value = k
-			info.func = SortMethod_OnClick
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, "No sorting");
-	--local text = OfflineDataCenterFrameSortDropDownText;
-	--local width = text:GetStringWidth();
-	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
-	--OfflineDataCenterFrameSortDropDown:SetWidth(width+60)
-end
-
 local function ChooseChar_OnClick(self)
-	selectChar = self.value
+	ODC.selectChar = self.value
 	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
-	ODC:SearchBarResetAndClear()
-	ODC:Update("sort")
+
+	ODC.CharChangedFunc[ODC.selectTab]()
 	
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
@@ -303,552 +53,38 @@ local function ChooseCharMenuInitialize(self, level)
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, selectChar);
+	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, ODC.selectChar);
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
 	ODC.Frame.chooseChar:SetWidth(width+60)
 end
 
-local function CalcLeftDay(player, mailIndex)
-	return floor(difftime(floor(MB_DB[player][mailIndex].daysLeft * 86400) + MB_DB[player].checkMailTick,time()) / 86400)
-end
-
-function ODC:UpdateSearch()
-	local MIN_REPEAT_CHARACTERS = 3;
-	local searchString = self.Frame.searchingBar:GetText();
-	if (len(searchString) > MIN_REPEAT_CHARACTERS) then
-		local repeatChar = true;
-		for i=1, MIN_REPEAT_CHARACTERS, 1 do 
-			if ( sub(searchString,(0-i), (0-i)) ~= sub(searchString,(-1-i),(-1-i)) ) then
-				repeatChar = false;
-				break;
-			end
-		end
-		if ( repeatChar ) then
-			self:SearchBarResetAndClear();
-			self:Update();
-			return;
-		end
-	end
-	self:Update();
-end
-
-function ODC:OpenEditbox()
-	self.Frame.searchingBarText:Hide();
-	self.Frame.searchingBar:Show();
-	self.Frame.searchingBar:SetText(SEARCH);
-	self.Frame.searchingBar:HighlightText();
-end
-
-function ODC:SearchBarResetAndClear()
-	self.Frame.searchingBarText:Show();
-	self.Frame.searchingBar:ClearFocus();
-	self.Frame.searchingBar:SetText("");
-end
-
-local function GetItemID(itemLink)
-	return tonumber(match(itemLink, "item:(%d+)"))
-end
-
----- Sorting ----
-
-function ODC:BuildSortOrder()
-	self.AhSortIndex = {__count = 0}
-	--local c = 0;
-	for i, iType in ipairs({GetAuctionItemClasses()}) do
-		self.AhSortIndex[iType] = i
-		self.AhSortIndex.__count = self.AhSortIndex.__count + 1
-		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			-- c = c + 1;
-			-- self.AhSortIndex[isType] = c;
-		-- end
-	end
-end
-
-function ODC:UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
-	local insertIndex
-	if revSubIdxTb.__count == 0 then --table is nil(money can add only once)
-		revSubIdxTb.__count = revSubIdxTb.__count + 1
-		insertIndex = revSubIdxTb.__count
-	elseif not method then --add to last
-		revSubIdxTb.__count = revSubIdxTb.__count + 1
-		insertIndex = revSubIdxTb.__count
-	elseif method == "AH" then--table is not empty
-		local AhIndex = self.AhSortIndex[keyword]
-		if not AhIndex then
-			self.AhSortIndex.__count = self.AhSortIndex.__count + 1
-			self.AhSortIndex[keyword] = self.AhSortIndex.__count
-			AhIndex = self.AhSortIndex.__count
-			
-		end
-		for i, v in ipairs(subIdxTb) do --table is not empty
-			
-			if self.AhSortIndex[subIdxTb[i].keyword] > AhIndex then --can insert before end of table
-				for ii = i, revSubIdxTb.__count do --move items after current key
-					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
-				end
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = i
-				break
-			elseif i == getn(subIdxTb) then --insert to end of table
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = revSubIdxTb.__count
-				break
-			end
-		end
-	elseif method == "quality" or method == "left day" then --keyword is sortable
-		for i, v in ipairs(subIdxTb) do --table is not empty
-			if subIdxTb[i].keyword > keyword then --can insert before end of table
-				for ii = i, revSubIdxTb.__count do --move items after current key
-					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
-				end
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = i
-				break
-			elseif i == getn(subIdxTb) then --insert to end of table
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = revSubIdxTb.__count
-				break
-			end
-		end
-	end
-	revSubIdxTb[keyword] = insertIndex
-	local t = {}
-	t.keyword = keyword
-	t.itemslotCount = 0
-	tinsert(subIdxTb, insertIndex, t)
-end
-
-function ODC:InsertToIndexTable(keyword, mailIndex, attachIndex, method)
-	if not keyword or not mailIndex then return end
-	if not revSubIdxTb[keyword] then
-		 self:UpdateRevIndexTable(keyword, method)
-	end
-	local subIdx = revSubIdxTb[keyword]
-	if method == "no-sorting" then
-		local itemIdxTb = {[1]={mailIndex = mailIndex,attachIndex = attachIndex}}
-		tinsert(subIdxTb[subIdx], itemIdxTb)
-		return
-	elseif method == "money" then
-		if keyword then
-			tinsert(subIdxTb[subIdx], mailIndex)
-		end
-		return
-	end
-	if not attachIndex then return end
-	local itemID = GetItemID(G_DB[selectChar][mailIndex][attachIndex].itemLink)
-	local itemIdxTb = {mailIndex = mailIndex,attachIndex = attachIndex}
-	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
-		subIdxTb[subIdx][1] = {itemID = itemID}--,["count"] = 1}
-		subIdxTb[subIdx][1][1] = itemIdxTb
-		subIdxTb[subIdx].itemslotCount = 1
-		return
-	else
-		for i, v in ipairs(subIdxTb[subIdx]) do
-			if subIdxTb[subIdx][i].itemID > itemID then --can insert before end of table
-				local t = {[1] = itemIdxTb, itemID = itemID}
-				tinsert(subIdxTb[subIdx], i, t)
-				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-				return
-			elseif subIdxTb[subIdx][i].itemID == itemID then --same itemID
-				for ii, v in ipairs(subIdxTb[subIdx][i]) do
-					if G_DB[selectChar][v.mailIndex][v.attachIndex].count >  G_DB[selectChar][mailIndex][attachIndex].count then --can insert before this count
-						tinsert(subIdxTb[subIdx][i], ii, itemIdxTb)
-						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-						return
-					elseif ii == getn(subIdxTb[subIdx][i]) then --insert to end of this itemID
-						tinsert(subIdxTb[subIdx][i], itemIdxTb)
-						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-						return
-					end
-				end
-			elseif i == getn(subIdxTb[subIdx]) then  --insert to end of table
-				local t = {[1] = itemIdxTb, itemID = itemID}
-				tinsert(subIdxTb[subIdx], t)
-				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-				return
-			end
-		end
-	end
-end
-
-local function SelectSortMethod()
-
-end
-
-ODC.SelectSortMethod = {
-	["No sorting"] = function(self, mailIndex, attachIndex)
-		local keyword = L["No sorting"]
-		self:InsertToIndexTable(keyword, mailIndex, attachIndex, "no-sorting")	
-	end,
-	["AH"] = function(self, mailIndex, attachIndex)
-		if not self.AhSortIndex then self:BuildSortOrder() end
-		local itemID = GetItemID(G_DB[selectChar][mailIndex][attachIndex].itemLink)
-		local _, _, itemRarity, _, _, itemType, _, _, _, _, _ = GetItemInfo(itemID)
-		self:InsertToIndexTable(itemType, mailIndex, attachIndex, "AH")
-	end,
-	["quality"] = function(self, mailIndex, attachIndex)
-		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[selectChar][mailIndex][attachIndex].itemLink)
-		self:InsertToIndexTable(quality, mailIndex, attachIndex, "quality")
-	end,
-	["sender"] = function(self, mailIndex, attachIndex)
-		local sender = G_DB[selectChar][mailIndex].sender
-		self:InsertToIndexTable(sender, mailIndex, attachIndex)	
-	end,--mailbox only
-	["left day"] = function(self, mailIndex, attachIndex)
-		local leftday = CalcLeftDay(selectChar, mailIndex)
-		self:InsertToIndexTable(leftday, mailIndex, attachIndex, "left day")
-	end,--mailbox only
-	["C.O.D."] = function(self, mailIndex, attachIndex)
-		local isCOD
-		if G_DB[selectChar][mailIndex].CODAmount then
-			isCOD = L["is C.O.D."]
-		else
-			isCOD = L["not C.O.D."]
-		end
-		self:InsertToIndexTable(isCOD, mailIndex, attachIndex)
-	end,--mailbox only
-	["money"] = function(self, mailIndex)
-		local hasMoney
-		if G_DB[selectChar][mailIndex].money then
-			hasMoney = L["has money"]
-		end
-		self:InsertToIndexTable(hasMoney, mailIndex, nil, "money")
-	end,--mailbox only
-}
-
---[[ subIdxTb structure
-			subType		itemsID			sameID items	slot?
-						(sort by ID)	(sort by count)
-subIdxTb{	[1]		{ 	[1]			{	[1]		=		{ [mailIndex, attachIndex](.itemCount)
-			[2]			[2]				[2]
-			...			...				...
-			[n]			[n]				[n]
-			/.method	.keyword		.itemID
-						.itemslotCount
-]]
---insert and return position (c)!
---先排序，再看过滤器，最后看堆叠
---排序已经完成，过滤器就是从排序当中得到子表。
---堆叠就是把同itemID的当做一个表插入到sortDB
---[[ revSubIdxTb structure
-				subTypeName		subType
-revSubIdxTb{	["a"] 		=	1
-				["b"]		=	2
-				...			
-				["n"]		=	n
-				.__count = count
-]]
---build filter menu base on subType!
-
-local function SummingForQuality(slotdb)
-	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
-	if not mailIndex or not attachIndex or not selectChar then return end
-	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[selectChar][mailIndex][attachIndex].itemLink)
-	if not quality then return end
-	if not sumQuality[quality] then sumQuality[quality] = 0 end
-	local count = G_DB[selectChar][mailIndex][attachIndex].count
-	sumQuality[quality] = sumQuality[quality] + count
-end
---[[
-structure of slotDB:
-case1: isStack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
-case2: not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]		{	[1].mailIndex .attachIndex
-case3: money only
-slotDB{		[1]		.mailIndex
-			[2]		
-]]
-
-function ODC:SubFilter(i, c)
-	for j = 1, getn(subIdxTb[i]) do
-		if not MB_Config.UI.isStacked then
-			for k = 1, getn(subIdxTb[i][j]) do
-				c = c + 1
-				slotDB[c] = {}
-				slotDB[c][1] = subIdxTb[i][j][k]--??
-				SummingForQuality(slotDB[c][1])
-			end
-		else
-			c = c + 1
-			slotDB[c] = subIdxTb[i][j]
-			for k = 1, getn(subIdxTb[i][j]) do
-				SummingForQuality(subIdxTb[i][j][k])
-			end
-		end
-	end
-	return c
-end
-
-function ODC:Filter()
-	if not subIdxTb then return end
-	slotDB = {}
-	sumQuality = {}
-	local filter = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown)
-	if not filter then filter = "__all" end
-	local c = 0
-	
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-	if method == "money" then
-		for i = 1, getn(subIdxTb[1]) do
-			c = c + 1
-			slotDB[c] = subIdxTb[1][i]
-		end
-		return
-	end
-	if filter == "__all" then
-		for i = 1, getn(subIdxTb) do
-			c = self:SubFilter(i, c)
-		end
-	else
-		i = revSubIdxTb[filter]
-		c = self:SubFilter(i, c)
-	end
-end
-
-function ODC:SortDB()
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-	if not method then return end
-	subIdxTb = {}
-	--subIdxTb.method = method
-	revSubIdxTb = {__count = 0}
-	if not G_DB[selectChar] then return end --by eui.cc
-	if selectTab == "mail" then
-		if not G_DB[selectChar].itemCount then return end
-		for mailIndex = 1, G_DB[selectChar].mailCount do
-			if not G_DB[selectChar][mailIndex] then return end
-			if method == "money" then
-				if G_DB[selectChar][mailIndex].money then
-					self.SelectSortMethod[method](self, mailIndex)
-				end
-			else
-				for attachIndex, t in pairs(G_DB[selectChar][mailIndex]) do
-					if type(t) == "table" then
-						self.SelectSortMethod[method](self, mailIndex, attachIndex)
-					end
-				end
-			end
-		end
-	elseif selectTab == "bank" then
-		local BagIDs = {-1, 5, 6, 7, 8, 9, 10, 11}
-		for i, bagIndex in ipairs(BagIDs) do
-			if G_DB[selectChar][bagIndex] then
-				for slotIndex = 1, G_DB[selectChar][bagIndex].slotMAX do
-					if type(G_DB[selectChar][bagIndex][slotIndex]) == "table" then
-						self.SelectSortMethod[method](self, bagIndex, slotIndex)
-					end
-				end
-			end
-		end
-	elseif selectTab == "bag" then
-		local BagIDs = {0, 1, 2, 3, 4}
-		for i, bagIndex in ipairs(BagIDs) do
-			if G_DB[selectChar][bagIndex] then
-				for slotIndex = 1, G_DB[selectChar][bagIndex].slotMAX do
-					if type(G_DB[selectChar][bagIndex][slotIndex]) == "table" then
-						self.SelectSortMethod[method](self, bagIndex, slotIndex)
-					end
-				end
-			end
-		end
-	elseif selectTab == "inventory" then
-		if G_DB[selectChar][1] then
-			for invIndex, invTable in pairs(G_DB[selectChar][1]) do
-				if type(invTable) == "table" then
-					self.SelectSortMethod[method](self, 1, invIndex)
-				end
-			end
-		end
-	end
-	if revSubIdxTb.__count == 0 then slotDB = nil; return end
-	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, FilterMenuInitialize)
-	self:Filter()
-end
-
-function ODC:UpdateContainer()
-	if not self.Frame or not self.Frame.Container then return end
-	for i = 1, self.config_const.itemsSlotDisplay do
-		if self.Frame.Container[i] then
-			self.Frame.Container[i]:Hide()
-		end
-	end
-	if not slotDB then return end
-	
-	local sumQ = ""
-	for i = 1, 7 do
-		if sumQuality[i] then
-			local _,_,_,colorCode = GetItemQualityColor(i)
-			if sumQ ~= "" then sumQ = sumQ.." / " end
-			sumQ = sumQ.."|c"..colorCode..sumQuality[i].."|r "
-		end
-	end
-	if sumQ ~= "" then
-		sumQ = "\r\n"..L["Quality summary: "]..sumQ
-	end
-	local former = ""
-	if G_DB[selectChar].money then
-		if selectTab == "mail" then
-			former = L["Mailbox gold: "]
-		elseif selectTab == "bag" or selectTab == "bank" then
-			former = L["Character gold: "]
-		end
-		former = former .. GetCoinTextureString(G_DB[selectChar].money)
-	end
-	self.Frame.mailboxGoldText:SetText(former..sumQ)
-	--self.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectChar].checkMailTick)/60).." 分鐘前掃描" or "");
-
-	local offset = FauxScrollFrame_GetOffset(self.Frame.scrollBar)
-	
-	local iconDisplayCount
-	if (getn(slotDB) - offset * 8) > self.config_const.itemsSlotDisplay then
-		iconDisplayCount = self.config_const.itemsSlotDisplay
-	else
-		iconDisplayCount = getn(slotDB) - offset * 8
-	end
-	
---[[
-structure of slotDB:
-case1&2: isStack = not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
-case3: money only
-slotDB{		[1]		.mailIndex
-			[2]
-
-				mailIndex	attachIndex
-[charName] = {	[1]			[1]			{	.count
-				[n]			.sender			.itemLink
-				.daysLeft 	.wasReturned?
-				.mailCount	.CODAmount?
-				.itemCount
-]]
-	for i = 1, iconDisplayCount do
-		local itemIndex = i + offset * 8
-		local slot = self.Frame.Container[i]
-		
-		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
-		----to clear this slot!
-		slot.count:SetText("")
-		slot.tex:SetTexture("")
-		slot.tex:SetVertexColor(1, 1, 1)
-		slot.count:SetTextColor(1, 1, 1)
-		slot.cod:Hide()
-		slot.mailIndex, slot.attachIndex = nil, nil
-		----ending
-		if method == "money" then
-			local mailIndex = slotDB[itemIndex]
-			slot.mailIndex = mailIndex
-			--slot = self:InsertToSlot(slot, slotDB[itemIndex], true, true)
-			local money = G_DB[selectChar][mailIndex].money
-			slot.tex:SetTexture(GetCoinIcon(money))
-			slot.count:SetText(money/10000)
-		else
-			slot.mailIndex = {}
-			slot.attachIndex = {}
-			for j = 1, getn(slotDB[itemIndex]) do
-				tinsert(slot.mailIndex, slotDB[itemIndex][j].mailIndex)
-				tinsert(slot.attachIndex, slotDB[itemIndex][j].attachIndex)
-			end
-			--local mailIndex, attachIndex = slotDB[itemIndex].mailIndex, slotDB[itemIndex].attachIndex--!!!!
-			--slot.data = slotDB[itemIndex]
-			slot.link = G_DB[selectChar][slot.mailIndex[1]][slot.attachIndex[1]].itemLink
-			if slot.link then
-				slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
-				if slot.rarity and slot.rarity > 1 then
-					local r, g, b = GetItemQualityColor(slot.rarity);
-					slot:SetBackdropBorderColor(r, g, b);
-				else
-					slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
-				end
-				slot.tex:SetTexture(slot.texture)
-			else
-				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
-			end
-			
-			local countnum = 0
-			for j = 1 , getn(slot.mailIndex) do
-				countnum = countnum + G_DB[selectChar][slot.mailIndex[j]][slot.attachIndex[j]].count
-				if G_DB[selectChar][slot.mailIndex[j]].CODAmount then
-				slot.tex:SetDesaturated(1)
-				slot.cod:Show()
-				end
-			end
-			slot.count:SetText(countnum > 1 and countnum or '');
-			
-			if self.Frame.searchingBar:HasFocus() then
-				if not slot.name then break end
-				local searchingStr = self.Frame.searchingBar:GetText();
-				if not find(slot.name, searchingStr) then
-					slot.tex:SetVertexColor(0.25, 0.25, 0.25)
-					slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
-					slot.count:SetTextColor(0.3, 0.3, 0.3)
-				end
-			end
-			
-		end
-		
-		slot:Show()
-	end
-	FauxScrollFrame_Update(self.Frame.scrollBar, ceil(getn(slotDB) / self.config_const.numItemsPerRow) , self.config_const.numItemsRows, self.config_const.buttonSize + self.config_const.buttonSpacing );
-end
-
-function ODC:Update(method)
-	if not ODC.Frame:IsVisible() then return end
-	if not self.SortDB then return end
-	--if not selectChar then return end
-	if method == "sort" then
-		self:SortDB()
-	elseif method == "filter" then
-		self:Filter()
-	end
-	self:UpdateContainer()
-end
-
 ---- GUI ----
 
-function ODC:SetActiveTab(typeStr, from)
-	local toggleStr = typeStr
-	--if toggleStr == 'bank' then toggleStr = 'bag' end
-	if not MB_Config.toggle[typeStr] then
-		print(ODC.TabTooltip[typeStr]..'is not Enabled')
+function ODC:SetActiveTab(tabName, showFrame)
+	self.selectTab = tabName
+	if not MB_Config.toggle[tabName] then
+		print(ODC.TabTooltip[tabName]..'is not Enabled')
 		return;
 	end
 
 	for k, v in pairs(MB_Config.toggle) do
-		if k == typeStr then
+		if k == tabName then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(true)
 		elseif v then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(false)
 		end
 	end
+	if showFrame then self:FrameShow() end
+	self.TabChangedFunc[tabName]()
 
-	if typeStr == 'mail' then
-		G_DB = MB_DB
-	elseif typeStr == 'inventory' then
-		G_DB = IN_DB
-	else
-		G_DB = BB_DB
-	end
-	UIDropDownMenu_Initialize(ODC.Frame.sortmethod, SortMenuInitialize)
-	--重新初始化各下拉选项框
-	--根据新的DB刷新SLOT
-	selectTab = typeStr
-
-	--ODC:FrameShow()
-	if from then
-		ODC:FrameShow()
-	end
-	ODC:Update("sort")
-	
 end
 	
 local function CreateODCFrame()
 	----Create ODC frame
-	local f = CreateFrame("Frame", "OfflineDataCenterFrame" , UIParent)
+	local name = "OfflineDataCenterFrame"
+	local f = CreateFrame("Frame", name , UIParent)
 	ODC.Frame = f
 	if MB_Config.UI == nil then MB_Config.UI = {} end
 	
@@ -879,21 +115,19 @@ local function CreateODCFrame()
 	end)
 	f:Hide()
 	
-	local name = "OfflineDataCenterFrame"
-		
-	----Create headline
-	f.headline = f:CreateFontString(nil, 'OVERLAY');
+	----Create title
+	f.title = f:CreateFontString(nil, 'OVERLAY');
 	if ElvUI then
-		f.headline:FontTemplate(nil, 14, 'OUTLINE')
+		f.title:FontTemplate(nil, 14, 'OUTLINE')
 	else
-		f.headline:SetFont(STANDARD_TEXT_FONT, 14);
+		f.title:SetFont(STANDARD_TEXT_FONT, 14);
 	end
-	f.headline:SetPoint("TOPLEFT", 10, -10);
-	f.headline:SetText(L["Offline Data Center"])
+	f.title:SetPoint("TOPLEFT", 10, -10);
+	f.title:SetText(L["Offline Data Center"])
 	
 	----Create choose char dropdown menu
 	f.chooseChar = CreateFrame('Frame', name..'ChooseCharDropDown', f, 'UIDropDownMenuTemplate')
-	f.chooseChar:SetPoint("LEFT", f.headline, f.headline:GetStringWidth(), -5)
+	f.chooseChar:SetPoint("LEFT", f.title, f.title:GetStringWidth(), -5)
 	--UIDropDownMenu_Initialize(f.chooseChar, self:DropDownMenuInitialize());
 	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameDropDown, 200);
 	
@@ -901,218 +135,10 @@ local function CreateODCFrame()
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
 	f.closeButton:SetPoint("TOPRIGHT", -2, -2);
 	f.closeButton:HookScript("OnClick", function()
-		ODC:SearchBarResetAndClear()
 		collectgarbage("collect")
 	end)
 	
-	----Search
-	if ElvUI then
-		f.searchingBar = CreateFrame('EditBox', nil, f);
-		f.searchingBar:CreateBackdrop('Default', true);
-	else
-		f.searchingBar = CreateFrame('EditBox', nil, f, "BagSearchBoxTemplate");
-	end
-	f.searchingBar:SetFrameLevel(f:GetFrameLevel() + 2);
-	f.searchingBar:SetHeight(15);
-	f.searchingBar:SetWidth(180);
-	f.searchingBar:Hide();
-	f.searchingBar:SetPoint('BOTTOMLEFT', f.headline, 'BOTTOMLEFT', 0, -30);
-	if ElvUI then
-		f.searchingBar:FontTemplate(nil, 12, 'OUTLINE')
-	else
-		f.searchingBar:SetFont(STANDARD_TEXT_FONT, 12);
-	end
-
-	f.searchingBarText = f:CreateFontString(nil, "ARTWORK");
-	if ElvUI then
-		f.searchingBarText:FontTemplate(nil, 12, 'OUTLINE')
-	else	
-		f.searchingBarText:SetFont(STANDARD_TEXT_FONT, 12);
-	end
-	f.searchingBarText:SetAllPoints(f.searchingBar);
-	f.searchingBarText:SetJustifyH("LEFT");
-	f.searchingBarText:SetText("|cff9999ff" .. SEARCH);
-	
-	f.searchingBar:SetAutoFocus(true);
-	f.searchingBar:SetText(SEARCH);
-		
-	local button = CreateFrame("Button", nil, f)
-	button:RegisterForClicks("LeftButtonUp", "RightButtonUp");
-	button:SetAllPoints(f.searchingBarText);
-	button:SetScript("OnClick", function(self, btn)
-		if btn == "RightButton" then
-			ODC:OpenEditbox();
-		else
-			if f.searchingBar:IsShown() then
-				ODC:SearchBarResetAndClear()
-			else
-				ODC:OpenEditbox();
-			end
-		end
-	end)
-	
-	----Create stack up button
-	f.stackUpCheckButton = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate");
-	f.stackUpCheckButton:SetPoint("LEFT",f.searchingBar, 200, 0)
-	f.stackUpCheckButton.text:SetText(L["Stack items"])
-	f.stackUpCheckButton:SetChecked(MB_Config.UI.isStacked or false)
-	f.stackUpCheckButton:SetScript("OnClick", function(self)
-		MB_Config.UI.isStacked = self:GetChecked()
-		ODC:Update("filter")
-	end)
-
-	----Create sort dropdown menu
-	tinsert(UISpecialFrames, f)
-	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
-	f.sortmethod:SetPoint("BOTTOMLEFT", f.searchingBar, 0, -36)
-	
-	----Create filter dropdown menu
-	f.filter = CreateFrame('Frame', name..'FilterDropDown', f, 'UIDropDownMenuTemplate')
-	f.filter:SetPoint("LEFT", f.sortmethod, 150, 0)
-	--UIDropDownMenu_Initialize(f.filter, f:FilterMenuInitialize);
-	
-	----Create mailbox gold text
-	f.mailboxGoldText = f:CreateFontString(nil, 'OVERLAY');
-	if ElvUI then
-		f.mailboxGoldText:FontTemplate(nil, 14, 'OUTLINE')
-	else
-		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 14);
-	end
-	--f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
-	f.mailboxGoldText:SetPoint("BOTTOMLEFT", 10, 5);
-	f.mailboxGoldText:SetJustifyH("LEFT");
-	
-	----Create check time text
-	-- f.checktime = f:CreateFontString(nil, 'OVERLAY');
-	-- f.checktime:FontTemplate()
-	-- f.checktime:SetPoint("BOTTOMLEFT", 20, 5);
-	
-	----Create scroll frame
-	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBar", f, "FauxScrollFrameTemplate")
-	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
-	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
-	f.scrollBar:SetHeight( ODC.config_const.numItemsRows * ODC.config_const.buttonSize + (ODC.config_const.numItemsRows - 1) * ODC.config_const.buttonSpacing)
-	f.scrollBar:Hide()
-	--f.scrollBar:EnableMouseWheel(true)
-	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, ODC.config_const.buttonSize + ODC.config_const.buttonSpacing);
-		ODC:Update()
-	end)
-	f.scrollBar:SetScript("OnShow", function()
-		ODC:Update()
-	end)
-	
-	if ElvUI then
-		local S = ElvUI[1]:GetModule("Skins")
-		if S then
-			S:HandleCloseButton(f.closeButton);
-			S:HandleCheckBox(f.stackUpCheckButton);
-			S:HandleDropDownBox(f.sortmethod)
-			S:HandleDropDownBox(f.filter)
-			S:HandleDropDownBox(f.chooseChar)
-			S:HandleButton(f.CollectGoldButton)
-			S:HandleScrollBar(_G[name.."ScrollBarScrollBar"])
-		end
-	end
-	
-	----Create Container
-	f.Container = CreateFrame('Frame', nil, f);
-	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -90);
-	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
-	f.Container:Show()
-	
-	local numContainerRows = 0;
-	local lastButton;
-	local lastRowButton;
-	for i = 1, ODC.config_const.itemsSlotDisplay do
-		local slot
-		if ElvUI then
-			slot = CreateFrame('Button', nil, f.Container);
-			slot:SetTemplate('Default');
-			slot:StyleButton();
-			slot:Size(ODC.config_const.buttonSize);
-		else
-			slot = CreateFrame('Button', nil, f.Container, "ItemButtonTemplate");
-			slot:SetSize(ODC.config_const.buttonSize, ODC.config_const.buttonSize);
-		end
-		slot:Hide()
-		
-		slot.count = slot:CreateFontString(nil, 'OVERLAY');
-		slot.cod = slot:CreateFontString(nil, 'OVERLAY');
-		if ElvUI then
-			slot.count:FontTemplate(nil, 12, 'OUTLINE')
-			slot.cod:FontTemplate(nil, 12, 'OUTLINE')
-		else
-			slot.count:SetFont(STANDARD_TEXT_FONT, 12, 'OUTLINE');
-			slot.cod:SetFont(STANDARD_TEXT_FONT, 12, 'OUTLINE');
-		end
-		slot.count:SetPoint('BOTTOMRIGHT', 0, 2);
-		slot.cod:SetPoint('TOPLEFT', 0, 2);
-		slot.cod:SetText("C.O.D.")
-		slot.cod:Hide()
-		
-		slot.tex = slot:CreateTexture(nil, "OVERLAY", nil)
-		slot.tex:SetPoint("TOPLEFT", slot, "TOPLEFT", 2, -2)
-		slot.tex:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
-		slot.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-		slot:SetScript("OnEnter", TooltipShow)
-		slot:HookScript("OnClick", SlotClick)
-		slot:SetScript("OnLeave", function()
-			GameTooltip:Hide()
-		end)
-		
-		f.Container[i] = slot
-		
-		if lastButton then
-			if (i - 1) % ODC.config_const.numItemsPerRow == 0 then
-				slot:SetPoint('TOP', lastRowButton, 'BOTTOM', 0, -ODC.config_const.buttonSpacing);
-				lastRowButton = f.Container[i];
-				numContainerRows = numContainerRows + 1;
-			else
-				slot:SetPoint('LEFT', lastButton, 'RIGHT', ODC.config_const.buttonSpacing, 0);
-			end
-		else
-			slot:SetPoint('TOPLEFT', f.Container, 'TOPLEFT',0, 0)
-			--slot:SetPoint('TOPLEFT', f, 'TOPLEFT', 8, -60);
-			lastRowButton = f.Container[i];
-			numContainerRows = numContainerRows + 1;
-		end
-		lastButton = f.Container[i];
-	end
-	
-	
-	---- SetScript
-	
-	f.searchingBar:SetScript("OnEscapePressed", function()
-		ODC:SearchBarResetAndClear()
-		ODC:Update()
-	end);
-	f.searchingBar:SetScript("OnEnterPressed", function()
-		ODC:SearchBarResetAndClear()
-		ODC:Update()
-	end);
-	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
-	f.searchingBar:SetScript("OnEditFocusGained", function(self)
-		self:HighlightText()
-		ODC:UpdateSearch()
-	end);
-	f.searchingBar:SetScript("OnTextChanged", function()
-		ODC:UpdateSearch()
-	end);
-	f.searchingBar:SetScript('OnChar', function()
-		ODC:UpdateSearch()
-	end);
-	
-	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
-		FauxScrollFrame_OnVerticalScroll(self, offset, ODC.config_const.buttonSize + ODC.config_const.buttonSpacing);
-		ODC:Update()
-	end)
-	f.scrollBar:SetScript("OnShow", function()
-		ODC:Update()
-	end)
-	
 	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
-	UIDropDownMenu_Initialize(f.sortmethod, SortMenuInitialize)
 end
 
 local function CreateFrameTab(f)
@@ -1201,146 +227,14 @@ function ODC:CreatePopupFrame()
 	f.cancle:SetPoint("BOTTOMRIGHT", -10, -5);
 	f.cancle:SetText(CANCEL)
 end
---[[
-Tool-tip format
-Left				Right
-sender1				count
-+lefttime1			count
- -was returned
-+lefttime2			count
-(is cod)			amount
-sender2				count
-+lefttime1			count
-]]
---[[
-structure of slotDB:
-case1: isStack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
-case2: not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]		{	[1].mailIndex .attachIndex
-case3: money only
-slotDB{		[1]		.mailIndex
-			[2]
-
-				mailIndex	attachIndex
-[charName] = {	[1]			[1]			{	.count!
-				[n]			.sender!		.itemLink
-				.mailCount	.wasReturned!
-				.itemCount	.CODAmount!
-							.money?
-							.daysLeft!
-]]
-local function GetLeftTimeText(mailIndex)
-	local lefttext = L["+ Left time: "]
-	local dayLeftTick = difftime(floor(MB_DB[selectChar][mailIndex].daysLeft * 86400) + MB_DB[selectChar].checkMailTick,time())
-	local leftday = floor(dayLeftTick / 86400)
-	if leftday > 0 then
-		lefttext = lefttext..format("> %d "..DAYS,leftday)
-	else
-		local lefthour = floor((dayLeftTick-leftday*86400) / 3600) 
-		local leftminute = floor((dayLeftTick-leftday*86400-lefthour*3600) / 60)
-		lefttext = lefttext..format( lefthour > 0 and "%d"..HOURS or "" ,lefthour)..format( leftminute > 0 and "%d"..MINUTES or "",leftminute)
-	end
-	return lefttext, leftday
-end
-
-function ODC:GameTooltip_OnTooltipCleared(TT)
-	if ( not TT ) then
-		TT = GameTooltip;
-	end
-	TT.ItemCleared = nil
-end
-
-local function AddItemTooltip(characterName, count, FoundDB)
-	if not FoundDB[characterName] then
-		FoundDB[characterName] = 0
-	end
-	FoundDB[characterName] = FoundDB[characterName] + count
-end
-
-local function LookupSameItem(itemID)
-	local FoundDB = {}
-	local BagIDs = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
-	for char, BB_Table in pairs(BB_DB) do --assume all character has this db
-		if type(char) == 'string' and type(BB_Table) == 'table' then
-			for i, bag in pairs(BagIDs) do
-				if BB_Table[bag] then
-					for j = 1, BB_Table[bag].slotMAX do
-						if BB_Table[bag][j] then
-							if GetItemID(BB_Table[bag][j].itemLink) == itemID then
-								AddItemTooltip(char, BB_Table[bag][j].count, FoundDB)
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	for char, MB_Table in pairs(MB_DB) do --assume all character has this db
-		if type(char) == 'string' and type(MB_Table) == 'table' then
-			for i = 1, MB_Table.mailCount do
-				if not MB_Table[i].CODAmount then
-					for j, MB_subTable in pairs(MB_Table[i]) do
-						if type(MB_subTable) == "table" then
-							if GetItemID(MB_subTable.itemLink) == itemID then
-								AddItemTooltip(char, MB_subTable.count, FoundDB)
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	return FoundDB
-end
-
-function ODC:GameTooltip_OnTooltipSetItem(TT)
-	if ( not TT ) then
-		TT = GameTooltip;
-	end
-	if not TT.ItemCleared then
-		TT:AddLine(" ")
-		local item, link = TT:GetItem()
-		if IsAltKeyDown() and link ~= nil then
-			local itemID = GetItemID(link)
-			local FoundDB = LookupSameItem(itemID)
-			for k, v in pairs(FoundDB) do
-				TT:AddDoubleLine('|cFFCA3C3C'..k..'|r', v)
-			end
-		else
-			TT:AddDoubleLine('|cFFCA3C3C'..L['Hold down the ALT key']..'|r', L['Show the number of items for all Character'])
-		end		
-		
-		TT.ItemCleared = true;
-	end		
-end
-
-StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
-    text = COD_CONFIRMATION,
-    button1 = ACCEPT,
-    button2 = CANCEL,
-    OnAccept = function(self)
-        TakeInboxItem(codMailIndex, codAttachmentIndex);
-    end,
-    OnShow = function(self)
-        MoneyFrame_Update(self.moneyFrame, codMoney);
-    end,
-    hasMoneyFrame = 1,
-    timeout = 0,
-    hideOnEscape = 1
-};
 
 function ODC:FrameShow()
-	-- self:UpdateContainer()
 	self.Frame:Show()
 end
 
 function ODC:FrameHide()
 	self.Frame:Hide()
-	self:SearchBarResetAndClear()
-	MB_Config.UI.activePage = selectTab
+	MB_Config.UI.activePage = self.selectTab
 	if not InCombatLockdown() then
 		collectgarbage("collect")
 	end
@@ -1515,35 +409,46 @@ local function CreateToggleButton(f)
 	return f
 end
 
----- Event ----
-
 function ODC:AddModule(module)
-	for k, v in pairs(module.TabTextures) do
-		self.TabTextures[k] = v
+	if module.type == "tab" then
+		for k, v in pairs(module.TabTextures) do
+			self.TabTextures[k] = v
+		end
+		for k, v in pairs(module.TabTooltip) do
+			self.TabTooltip[k] = v
+		end
+		CreateFrameTab(ODC.Frame)
 	end
-	for k, v in pairs(module.TabTooltip) do
-		self.TabTooltip[k] = v
-	end
-	CreateFrameTab(ODC.Frame)
 	--self:SetActiveTab(selectTab)
 end
 
 function ODC:RemoveModule(module)
-	for k, v in pairs(module.TabTextures) do
-		self.TabTextures[k] = nil
+	if module.type == "tab" then
+		for k, v in pairs(module.TabTextures) do
+			self.TabTextures[k] = nil
+		end
+		for k, v in pairs(module.TabTooltip) do
+			self.TabTooltip[k] = nil
+		end
+		CreateFrameTab(ODC.Frame)
 	end
-	for k, v in pairs(module.TabTooltip) do
-		self.TabTooltip[k] = nil
+end
+-- ODC.TabChangedFunc = {}
+-- ODC.CharChangedFunc = {}
+function ODC:AddFunc(name, action, func)
+	if action == "selectTab" then
+		self.TabChangedFunc[name] = func
+	elseif action == "selectChar" then
+		self.CharChangedFunc[name] = func
 	end
-	CreateFrameTab(ODC.Frame)
 end
 
-function ODC:AddFeed(name, func)
-
-end
-
-function ODC:RemoveFeed(name, func)
-
+function ODC:RemoveFunc(name, action)
+	if action == "selectTab" then
+		self.TabChangedFunc[name] = nil
+	elseif action == "selectChar" then
+		self.CharChangedFunc[name] = nil
+	end
 end
 
 function ODC:OpenBags()
@@ -1562,11 +467,11 @@ function ODC:Toggle()
 		}
 	end
 	local tabNumber = 0
-	selectTab = MB_Config.UI.activePage
+	self.selectTab = MB_Config.UI.activePage
 	for k, v in pairs(MB_Config.toggle) do
 		tabNumber = tabNumber + 1
-		if not selectTab then
-			selectTab = k
+		if not self.selectTab then
+			self.selectTab = k
 		end
 	end
 
@@ -1580,22 +485,17 @@ function ODC:Toggle()
 end
 		
 function ODC:OnInitialize()
-	if MB_Config == nil then MB_Config = {UI = {}} end
-	if MB_Config.UI == nil then MB_Config.UI = {} end
-	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
-	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
+	if MB_Config == nil then MB_Config = {UI = {},player = {}} end
+	--if MB_Config.UI == nil then MB_Config.UI = {} end
+	--MB_Config.player[ODC.playername] = true
 	
 	--self:Toggle()
 	CreateODCFrame()
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
 	if not IN_DB then IN_DB = {} end
-	
-	-- if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
-	-- if not BB_DB[playername] then BB_DB[playername] = {} end
-	-- if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	-- if not IN_DB[playername] then self:CheckEquipped() end
-	
+	self:SecureHook('OpenAllBags', 'OpenBags')
+	self:SecureHook('ToggleBag', 'OpenBags')
 	---- Slash command ----
 
 	SLASH_OFFLINEDATACENTER1 = "/mb";
@@ -1604,7 +504,7 @@ function ODC:OnInitialize()
 		if self.Frame:IsVisible() then
 			self:FrameHide()
 		else
-			self:Update("sort")
+			--self:Update("sort")
 			self:FrameShow()
 		end
 	end;	

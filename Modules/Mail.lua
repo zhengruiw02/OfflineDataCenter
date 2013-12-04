@@ -1,7 +1,10 @@
 local ODC = LibStub("AceAddon-3.0"):GetAddon("OfflineDataCenter")
+local ODC_SF = ODC:GetModule("SortFilter")
+if not ODC_SF then return end
 local ODC_Mail = ODC:NewModule("OfflineMail", "AceEvent-3.0", "AceHook-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 ODC_Mail.description = L["Offline MailBox"]
+ODC_Mail.type = "tab"
 
 ODC_Mail.TabTextures = {
 	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
@@ -12,7 +15,6 @@ ODC_Mail.TabTooltip = {
 }
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
---local MB_Config, MB_DB = ODC.MB_Config, ODC.MB_DB
 
 local function AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
 	if recipient and firstItem then
@@ -85,7 +87,7 @@ function ODC_Mail:CheckMail()
 	MB_DB[playername].checkMailTick = time()
 	
 	if ODC.Frame:IsVisible() and selectChar == playername and selectTab == "mail" then
-		ODC:Update("sort")
+		ODC_SF:Update("sort")
 	end
 end
 
@@ -116,7 +118,7 @@ function ODC_Mail:HookSendMail(recipient, subject, body)
 					end
 				end
 				if ODC.Frame:IsVisible() and selectChar == k then
-					ODC:Update("sort")
+					ODC_SF:Update("sort")
 				end
 				return
 			end
@@ -176,9 +178,20 @@ function ODC_Mail:OnInitialize()
 	end
 end
 
+local SelectTabFunc = function()
+	ODC_SF:UpdateSortMenu()
+	ODC_SF:Update("sort")
+end
+
+local SelectCharFunc = function()
+	ODC_SF:Update("sort")
+end
+
 function ODC_Mail:OnEnable()
 	MB_Config.toggle.mail = true
-	ODC:AddModule(self)	
+	ODC:AddModule(self)
+	ODC:AddFunc("mail", "selectTab", SelectTabFunc)
+	ODC:AddFunc("mail", "selectChar", SelectCharFunc)
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:SecureHook('SendMail', 'HookSendMail');
 end
@@ -186,6 +199,8 @@ end
 function ODC_Mail:OnDisable()
 	MB_Config.toggle.mail = false
 	ODC:RemoveModule(self)
+	ODC:RemoveFunc("mail", "selectTab")
+	ODC:RemoveFunc("mail", "selectTab")
 	-- self:UnhookAll()	
 	-- self:UnregisterEvent("MAIL_INBOX_UPDATE")
 end

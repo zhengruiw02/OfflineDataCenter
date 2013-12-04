@@ -1,7 +1,10 @@
 local ODC = LibStub("AceAddon-3.0"):GetAddon("OfflineDataCenter")
+local ODC_SF = ODC:GetModule("SortFilter")
+if not ODC_SF then return end
 local ODC_Bag = ODC:NewModule("OfflineBag", "AceEvent-3.0", "AceHook-3.0", "AceTimer-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 ODC_Bag.description = L["Offline Bag"]
+ODC_Bag.type = "tab"
 
 ODC_Bag.TabTextures = {
 	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
@@ -14,7 +17,6 @@ ODC_Bag.TabTooltip = {
 }
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
---local MB_Config, BB_DB = ODC.MB_Config, ODC.BB_DB
 
 local function AddItemBag(itemLink, count, bagID, slotID)
 	BB_DB[playername][bagID][slotID] = {count = count, itemLink = itemLink}
@@ -50,7 +52,7 @@ function ODC_Bag:CheckBags()
 	end
 	
 	if ODC.Frame:IsVisible() and selectChar == playername and (selectTab == "bag" or selectTab == "bank") then
-		ODC:Update("sort")
+		ODC_SF:Update("sort")
 	end
 end
 
@@ -68,10 +70,32 @@ function ODC_Bag:BANKFRAME_CLOSED()
 	self.isBankOpened = nil
 end
 
+local SelectTabFuncBag = function()
+	ODC_SF:UpdateSortMenu()
+	ODC_SF:Update("sort")
+end
+
+local SelectTabFuncBank = function()
+	ODC_SF:UpdateSortMenu()
+	ODC_SF:Update("sort")
+end
+
+local SelectCharFuncBag = function()
+	ODC_SF:Update("sort")
+end
+
+local SelectCharFuncBank = function()
+	ODC_SF:Update("sort")
+end
+
 function ODC_Bag:OnEnable()
 	MB_Config.toggle.bag = true
 	MB_Config.toggle.bank = true
 	ODC:AddModule(self)
+	ODC:AddFunc("bag", "selectTab", SelectTabFuncBag)
+	ODC:AddFunc("bank", "selectTab", SelectTabFuncBank)
+	ODC:AddFunc("bag", "selectChar", SelectCharFuncBag)
+	ODC:AddFunc("bank", "selectChar", SelectCharFuncBank)
 	if not BB_DB[playername] then BB_DB[playername] = {} end
 	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
 	self:RegisterEvent("BANKFRAME_OPENED")
@@ -85,6 +109,10 @@ function ODC_Bag:OnDisable()
 	MB_Config.toggle.bag = false
 	MB_Config.toggle.bank = false
 	ODC:RemoveModule(self)
+	ODC:RemoveFunc("bag", "selectTab")
+	ODC:RemoveFunc("bank", "selectTab")
+	ODC:RemoveFunc("bag", "selectChar")
+	ODC:RemoveFunc("bank", "selectChar")
 	-- self:UnhookAll()
 	-- self:UnregisterEvent("BANKFRAME_OPENED")
 	-- self:UnregisterEvent("BANKFRAME_CLOSED")	
