@@ -865,10 +865,11 @@ local function SearchBarResetAndClear()
 	self.Frame.searchingBar:SetText("");
 end
 
-function ODC_SortFilter:AddToMainFrame()
+function ODC_SortFilter:CreateSubFrame()
 	local name = "OfflineDataCenterFrame"
 ---- THE FOLLOWING CODE SHOULD BE MOVED TO MODULE ----
-	local f = ODC.Frame
+	local f = CreateFrame('Frame');
+	self.Frame = f
 	----Search
 	if ElvUI then
 		f.searchingBar = CreateFrame('EditBox', nil, f);
@@ -941,7 +942,6 @@ function ODC_SortFilter:AddToMainFrame()
 	else
 		f.mailboxGoldText:SetFont(STANDARD_TEXT_FONT, 14);
 	end
-	--f.mailboxGoldText:SetPoint("LEFT", f.CollectGoldButton, "RIGHT", 20, 0);
 	f.mailboxGoldText:SetPoint("BOTTOMLEFT", 10, 5);
 	f.mailboxGoldText:SetJustifyH("LEFT");
 	
@@ -968,12 +968,9 @@ function ODC_SortFilter:AddToMainFrame()
 	if ElvUI then
 		local S = ElvUI[1]:GetModule("Skins")
 		if S then
-			S:HandleCloseButton(f.closeButton);
 			S:HandleCheckBox(f.stackUpCheckButton);
 			S:HandleDropDownBox(f.sortmethod)
 			S:HandleDropDownBox(f.filter)
-			S:HandleDropDownBox(f.chooseChar)
-			S:HandleButton(f.CollectGoldButton)
 			S:HandleScrollBar(_G[name.."ScrollBarScrollBar"])
 		end
 	end
@@ -1074,7 +1071,7 @@ function ODC_SortFilter:AddToMainFrame()
 end
 
 function ODC_SortFilter:UpdateSortMenu()
-	UIDropDownMenu_Initialize(ODC.Frame.sortmethod, SortMenuInitialize)
+	UIDropDownMenu_Initialize(ODC_SortFilter.Frame.sortmethod, SortMenuInitialize)
 end
 
 function ODC_SortFilter:Update(method)
@@ -1104,7 +1101,7 @@ function ODC_SortFilter:OnEnable()
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	ODC:AddModule(self)
-	self:AddToMainFrame()
+	self:CreateSubFrame()
 end
 
 function ODC_SortFilter:OnDisable()

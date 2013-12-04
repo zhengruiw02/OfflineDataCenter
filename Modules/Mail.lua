@@ -179,6 +179,7 @@ function ODC_Mail:OnInitialize()
 end
 
 local SelectTabFunc = function()
+	ODC_SF.Frame:SetParent("OfflineDataCenterFrameSubFrame")
 	ODC_SF:UpdateSortMenu()
 	ODC_SF:Update("sort")
 end

@@ -77,6 +77,7 @@ function ODC:SetActiveTab(tabName, showFrame)
 		end
 	end
 	if showFrame then self:FrameShow() end
+	
 	self.TabChangedFunc[tabName]()
 
 end
@@ -128,7 +129,7 @@ local function CreateODCFrame()
 	----Create choose char dropdown menu
 	f.chooseChar = CreateFrame('Frame', name..'ChooseCharDropDown', f, 'UIDropDownMenuTemplate')
 	f.chooseChar:SetPoint("LEFT", f.title, f.title:GetStringWidth(), -5)
-	--UIDropDownMenu_Initialize(f.chooseChar, self:DropDownMenuInitialize());
+	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
 	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameDropDown, 200);
 	
 	----Create close button
@@ -138,7 +139,18 @@ local function CreateODCFrame()
 		collectgarbage("collect")
 	end)
 	
-	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
+	----Create container for subFrame
+	f.subFrame = CreateFrame('Frame', name.."SubFrame", f);
+	f.subFrame:SetPoint('TOPLEFT', 12, -90);
+	f.subFrame:SetPoint('BOTTOMRIGHT', 0, 0);
+	
+	if ElvUI then
+		local S = ElvUI[1]:GetModule("Skins")
+		if S then
+			S:HandleCloseButton(f.closeButton);
+			S:HandleDropDownBox(f.chooseChar)
+		end
+	end
 end
 
 local function CreateFrameTab(f)
