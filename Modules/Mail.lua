@@ -16,6 +16,10 @@ ODC_Mail.TabTooltip = {
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
 
+local Config = {
+	daysLeftWarning = 5,
+}
+
 local function AddItemMail(itemLink, count, mailIndex, attachIndex, sender, daysLeft, money, CODAmount, wasReturned, recipient, firstItem)
 	if recipient and firstItem then
 		local t ={}
@@ -137,7 +141,7 @@ local function AlertDeadlineMails()
 		--.mailCount .itemCount
 			for i = MB_DB[k].mailCount , 1, -1 do
 				local dayLeft = CalcLeftDay(k, i)
-				if dayLeft < ODC.config_const.daysLeftWarning then
+				if dayLeft < Config.daysLeftWarning then
 					if not DeadlineList[k] then 
 						DeadlineList[k] = {}
 						DeadlineList.__count = DeadlineList.__count +1

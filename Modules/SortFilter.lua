@@ -4,6 +4,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 --ODC_SortFilter.description = L["Offline Bag"]
 ODC_SortFilter.type = "subFrame"
 
+local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
 local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged
@@ -15,7 +16,6 @@ local AhSortIndex
 local Config = {
 	daysLeftYellow = 7,
 	daysLeftRed = 3,
-	daysLeftWarning = 5,
 	buttonSize = 36,
 	buttonSpacing = 4,
 	numItemsPerRow = 8,
