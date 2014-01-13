@@ -71,13 +71,13 @@ function ODC_Bag:BANKFRAME_CLOSED()
 end
 
 local SelectTabFuncBag = function()
-	ODC_SF.Frame:SetParent("OfflineDataCenterFrameSubFrame")
+	ODC_SF:CreateOrShowSubFrame("bag")
 	ODC_SF:UpdateSortMenu()
 	ODC_SF:Update("sort")
 end
 
 local SelectTabFuncBank = function()
-	ODC_SF.Frame:SetParent("OfflineDataCenterFrameSubFrame")
+	ODC_SF:CreateOrShowSubFrame("bank")
 	ODC_SF:UpdateSortMenu()
 	ODC_SF:Update("sort")
 end

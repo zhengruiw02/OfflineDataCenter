@@ -7,7 +7,7 @@ ODC_SortFilter.type = "subFrame"
 local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
 local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
-local selectSortChanged
+local selectSortChanged, isStacked
 local codMoney, codMailIndex, codAttachmentIndex
 
 local AhSortIndex
@@ -137,7 +137,7 @@ local function SlotClick(self,button)----self=slot
 			ChatFrame1EditBox:SetText("");
 			ChatFrame1EditBox:Hide();
 		end
-	elseif button == 'LeftButton' and not MB_Config.UI.isStacked then
+	elseif button == 'LeftButton' and not isStacked then --MB_Config.UI.isStacked
 		if selectTab == "mail" then
 			if MB_DB[selectChar][self.mailIndex[1]].CODAmount then
 				if MB_DB[selectChar][self.mailIndex[1]].CODAmount > GetMoney() then
@@ -486,7 +486,7 @@ slotDB{		[1]		.mailIndex
 
 local function SubFilter(i, c)
 	for j = 1, getn(subIdxTb[i]) do
-		if not MB_Config.UI.isStacked then
+		if not isStacked then --MB_Config.UI.isStacked
 			for k = 1, getn(subIdxTb[i][j]) do
 				c = c + 1
 				slotDB[c] = {}
@@ -832,9 +832,9 @@ function ODC_SortFilter:GameTooltip_OnTooltipSetItem(TT)
 	end		
 end
 
-local function UpdateSearch()
+function ODC_SortFilter:UpdateSearch()
 	local MIN_REPEAT_CHARACTERS = 3;
-	local searchString = ODC.Frame.searchingBar:GetText();
+	local searchString = ODC_SortFilter.Frame.searchingBar:GetText();
 	if (len(searchString) > MIN_REPEAT_CHARACTERS) then
 		local repeatChar = true;
 		for i=1, MIN_REPEAT_CHARACTERS, 1 do 
@@ -844,7 +844,7 @@ local function UpdateSearch()
 			end
 		end
 		if ( repeatChar ) then
-			SearchBarResetAndClear();
+			ODC_SortFilter:SearchBarResetAndClear();
 			ODC_SortFilter:Update();
 			return;
 		end
@@ -852,24 +852,29 @@ local function UpdateSearch()
 	ODC_SortFilter:Update();
 end
 
-local function OpenEditbox()
+function ODC_SortFilter:OpenEditbox()
 	self.Frame.searchingBarText:Hide();
 	self.Frame.searchingBar:Show();
 	self.Frame.searchingBar:SetText(SEARCH);
 	self.Frame.searchingBar:HighlightText();
 end
 
-local function SearchBarResetAndClear()
+function ODC_SortFilter:SearchBarResetAndClear()
 	self.Frame.searchingBarText:Show();
 	self.Frame.searchingBar:ClearFocus();
 	self.Frame.searchingBar:SetText("");
 end
 
-function ODC_SortFilter:CreateSubFrame()
+local function CreateSubFrame()
 	local name = "OfflineDataCenterFrame"
 ---- THE FOLLOWING CODE SHOULD BE MOVED TO MODULE ----
-	local f = CreateFrame('Frame');
-	self.Frame = f
+	----local f = ODC:CreateSubFrame()
+	local p = ODC.Frame
+	local f = CreateFrame('Frame',name.."SortFilterSubFrame", p);
+	f:SetPoint('TOPLEFT', 0, -40);
+	f:SetPoint('BOTTOMRIGHT', 0, 0);
+	ODC_SortFilter.Frame = f
+	
 	----Search
 	if ElvUI then
 		f.searchingBar = CreateFrame('EditBox', nil, f);
@@ -881,7 +886,7 @@ function ODC_SortFilter:CreateSubFrame()
 	f.searchingBar:SetHeight(15);
 	f.searchingBar:SetWidth(180);
 	f.searchingBar:Hide();
-	f.searchingBar:SetPoint('BOTTOMLEFT', f.headline, 'BOTTOMLEFT', 0, -30);
+	f.searchingBar:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, 0);
 	if ElvUI then
 		f.searchingBar:FontTemplate(nil, 12, 'OUTLINE')
 	else
@@ -906,12 +911,12 @@ function ODC_SortFilter:CreateSubFrame()
 	button:SetAllPoints(f.searchingBarText);
 	button:SetScript("OnClick", function(self, btn)
 		if btn == "RightButton" then
-			OpenEditbox();
+			ODC_SortFilter:OpenEditbox();
 		else
 			if f.searchingBar:IsShown() then
-				SearchBarResetAndClear()
+				ODC_SortFilter:SearchBarResetAndClear()
 			else
-				OpenEditbox();
+				ODC_SortFilter:OpenEditbox();
 			end
 		end
 	end)
@@ -920,9 +925,10 @@ function ODC_SortFilter:CreateSubFrame()
 	f.stackUpCheckButton = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate");
 	f.stackUpCheckButton:SetPoint("LEFT",f.searchingBar, 200, 0)
 	f.stackUpCheckButton.text:SetText(L["Stack items"])
-	f.stackUpCheckButton:SetChecked(MB_Config.UI.isStacked or false)
+	f.stackUpCheckButton:SetChecked(false)--MB_Config.UI.isStacked or false)
 	f.stackUpCheckButton:SetScript("OnClick", function(self)
-		MB_Config.UI.isStacked = self:GetChecked()
+		--MB_Config.UI.isStacked = self:GetChecked()
+		isStacked = self:GetChecked()
 		ODC_SortFilter:Update("filter")
 	end)
 
@@ -977,7 +983,7 @@ function ODC_SortFilter:CreateSubFrame()
 	
 	----Create Container
 	f.Container = CreateFrame('Frame', nil, f);
-	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -90);
+	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -30);-- -90);
 	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container:Show()
 	
@@ -1040,24 +1046,27 @@ function ODC_SortFilter:CreateSubFrame()
 		lastButton = f.Container[i];
 	end
 	
-	
 	---- SetScript
 	
 	f.searchingBar:SetScript("OnEscapePressed", function()
-		SearchBarResetAndClear()
+		ODC_SortFilter:SearchBarResetAndClear()
 		ODC_SortFilter:Update()
 	end);
 	f.searchingBar:SetScript("OnEnterPressed", function()
-		SearchBarResetAndClear()
+		ODC_SortFilter:SearchBarResetAndClear()
 		ODC_SortFilter:Update()
 	end);
 	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
 	f.searchingBar:SetScript("OnEditFocusGained", function(self)
 		self:HighlightText()
-		UpdateSearch()
+		ODC_SortFilter:UpdateSearch()
 	end);
-	f.searchingBar:SetScript("OnTextChanged", UpdateSearch);
-	f.searchingBar:SetScript('OnChar', UpdateSearch);
+	f.searchingBar:SetScript("OnTextChanged", function()
+		ODC_SortFilter:UpdateSearch()
+	end);
+	f.searchingBar:SetScript('OnChar', function()
+		ODC_SortFilter:UpdateSearch()
+	end);
 	
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
 		FauxScrollFrame_OnVerticalScroll(self, offset, Config.buttonSize + Config.buttonSpacing);
@@ -1068,6 +1077,16 @@ function ODC_SortFilter:CreateSubFrame()
 	end)
 	--UIDropDownMenu_Initialize(f.sortmethod, SortMenuInitialize)
 ---- THE CODE ABOVE SHOULD BE MOVED TO MODULE ----
+end
+
+function ODC_SortFilter:CreateOrShowSubFrame(moduleName)
+	if not self.Frame then
+		CreateSubFrame()
+	end
+	if not ODC.subFrame[moduleName] then
+		ODC.AddSubFrame(moduleName, ODC_SortFilter.Frame)
+	end
+	ODC:ShowSubFrame (moduleName)
 end
 
 function ODC_SortFilter:UpdateSortMenu()
@@ -1089,7 +1108,7 @@ function ODC_SortFilter:Update(method)
 	end
 	
 	if method == "sort" then
-		SearchBarResetAndClear()
+		self:SearchBarResetAndClear()
 		SortDB()
 	elseif method == "filter" then
 		Filter()
@@ -1101,7 +1120,7 @@ function ODC_SortFilter:OnEnable()
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	ODC:AddModule(self)
-	self:CreateSubFrame()
+	--self:CreateSubFrame()
 end
 
 function ODC_SortFilter:OnDisable()

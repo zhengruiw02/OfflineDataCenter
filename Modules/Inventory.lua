@@ -57,7 +57,7 @@ function ODC_Inventory:REPLACE_ENCHANT()
 end
 
 local SelectTabFunc = function()
-	ODC_SF.Frame:SetParent("OfflineDataCenterFrameSubFrame")
+	ODC_SF:CreateOrShowSubFrame("inventory")
 	ODC_SF:UpdateSortMenu()
 	ODC_SF:Update("sort")
 end

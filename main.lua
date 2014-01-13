@@ -16,6 +16,7 @@ ODC.selectChar = ODC.playername
 ODC.selectTab = nil
 
 ODC.module = {}
+ODC.subFrame = {}
 ODC.TabTextures = {}
 ODC.TabTooltip = {}
 ODC.PopupMenu = {}
@@ -58,6 +59,17 @@ local function ChooseCharMenuInitialize(self, level)
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
 	ODC.Frame.chooseChar:SetWidth(width+60)
+end
+
+function ODC:ShowSubFrame (moduleName)
+	local frameName = self.subFrame[moduleName]
+	for module, frame in pairs(self.subFrame) do
+		if ( frame ~= frameName ) then
+			_G[frame]:Hide();
+		else
+			_G[frame]:Show();
+		end
+	end 
 end
 
 ---- GUI ----
@@ -140,9 +152,10 @@ local function CreateODCFrame()
 	end)
 	
 	----Create container for subFrame
+	--[[
 	f.subFrame = CreateFrame('Frame', name.."SubFrame", f);
-	f.subFrame:SetPoint('TOPLEFT', 12, -90);
-	f.subFrame:SetPoint('BOTTOMRIGHT', 0, 0);
+	f.subFrame:SetPoint('TOPLEFT', 0, -40);
+	f.subFrame:SetPoint('BOTTOMRIGHT', 0, 0);]]
 	
 	if ElvUI then
 		local S = ElvUI[1]:GetModule("Skins")
@@ -151,6 +164,10 @@ local function CreateODCFrame()
 			S:HandleDropDownBox(f.chooseChar)
 		end
 	end
+end
+
+function ODC:AddSubFrame(moduleName, subFrame)
+	ODC.subFrame[moduleName] = subFrame
 end
 
 local function CreateFrameTab(f)
@@ -478,6 +495,9 @@ function ODC:Toggle()
 			['inventory'] = true,
 		}
 	end
+	
+	if true then return end
+	
 	local tabNumber = 0
 	self.selectTab = MB_Config.UI.activePage
 	for k, v in pairs(MB_Config.toggle) do
@@ -501,7 +521,7 @@ function ODC:OnInitialize()
 	--if MB_Config.UI == nil then MB_Config.UI = {} end
 	--MB_Config.player[ODC.playername] = true
 	
-	--self:Toggle()
+	self:Toggle()
 	CreateODCFrame()
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
