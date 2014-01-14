@@ -529,13 +529,11 @@ end
 
 local function SortDB()
 	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
-	print("method="..(method or "nil"))
 	if not method then return end
 	subIdxTb = {}
 	--subIdxTb.method = method
 	revSubIdxTb = {__count = 0}
 	if not G_DB[selectChar] then return end --by eui.cc
-	print(playername);print(selectChar);print(selectTab)
 	if selectTab == "mail" then
 		if not G_DB[selectChar].itemCount then return end
 		for mailIndex = 1, G_DB[selectChar].mailCount do
@@ -589,14 +587,16 @@ local function SortDB()
 end
 
 local function UpdateContainer()
-	if not ODC.Frame or not ODC.Frame.Container then return end
+	if not ODC.Frame or not ODC_SortFilter.Frame then return end
+	ODC_SortFilter.Frame.mailboxGoldText:SetText("")
+	
 	for i = 1, Config.itemsSlotDisplay do
-		if ODC.Frame.Container[i] then
-			ODC.Frame.Container[i]:Hide()
+		if ODC_SortFilter.Frame.Container[i] then
+			ODC_SortFilter.Frame.Container[i]:Hide()
 		end
 	end
 	if not slotDB then return end
-	print("hasslotDB")
+	
 	local sumQ = ""
 	for i = 1, 7 do
 		if sumQuality[i] then
@@ -617,10 +617,10 @@ local function UpdateContainer()
 		end
 		former = former .. GetCoinTextureString(G_DB[selectChar].money)
 	end
-	ODC.Frame.mailboxGoldText:SetText(former..sumQ)
+	ODC_SortFilter.Frame.mailboxGoldText:SetText(former..sumQ)
 	--ODC.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectChar].checkMailTick)/60).." 分鐘前掃描" or "");
 
-	local offset = FauxScrollFrame_GetOffset(ODC.Frame.scrollBar)
+	local offset = FauxScrollFrame_GetOffset(ODC_SortFilter.Frame.scrollBar)
 	
 	local iconDisplayCount
 	if (getn(slotDB) - offset * 8) > Config.itemsSlotDisplay then
@@ -647,7 +647,7 @@ slotDB{		[1]		.mailIndex
 ]]
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
-		local slot = ODC.Frame.Container[i]
+		local slot = ODC_SortFilter.Frame.Container[i]
 		
 		local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 		----to clear this slot!
@@ -698,9 +698,9 @@ slotDB{		[1]		.mailIndex
 			end
 			slot.count:SetText(countnum > 1 and countnum or '');
 			
-			if ODC.Frame.searchingBar:HasFocus() then
+			if ODC_SortFilter.Frame.searchingBar:HasFocus() then
 				if not slot.name then break end
-				local searchingStr = ODC.Frame.searchingBar:GetText();
+				local searchingStr = ODC_SortFilter.Frame.searchingBar:GetText();
 				if not find(slot.name, searchingStr) then
 					slot.tex:SetVertexColor(0.25, 0.25, 0.25)
 					slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
@@ -712,7 +712,7 @@ slotDB{		[1]		.mailIndex
 		
 		slot:Show()
 	end
-	FauxScrollFrame_Update(ODC.Frame.scrollBar, ceil(getn(slotDB) / Config.numItemsPerRow) , Config.numItemsRows, Config.buttonSize + Config.buttonSpacing );
+	FauxScrollFrame_Update(ODC_SortFilter.Frame.scrollBar, ceil(getn(slotDB) / Config.numItemsPerRow) , Config.numItemsRows, Config.buttonSize + Config.buttonSpacing );
 end
 
 --[[
