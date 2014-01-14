@@ -9,6 +9,7 @@ local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.se
 local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
 local selectSortChanged, isStacked
 local codMoney, codMailIndex, codAttachmentIndex
+local FRAMENAME = "ODCFrameSortFilterSubFrame"
 
 local AhSortIndex
 
@@ -40,7 +41,7 @@ end
 
 --function ODC:Filter_OnClick(self)
 local function Filter_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, self.value);
+	UIDropDownMenu_SetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown, self.value);
 	ODC_SortFilter:Update("filter")
 end
 
@@ -56,7 +57,7 @@ local function FilterMenuInitialize(self, level)
 	for k, v in ipairs(subIdxTb) do
 		info = UIDropDownMenu_CreateInfo()
 		local t
-		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+		local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 		if method == "quality" then
 			t = _G["ITEM_QUALITY"..v.keyword.."_DESC"]
 		elseif method == "left day" then
@@ -70,14 +71,14 @@ local function FilterMenuInitialize(self, level)
 		UIDropDownMenu_AddButton(info, level)
 	end
 	
-	if UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown) == nil or selectSortChanged == true then
-		UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameFilterDropDown, "__all");
+	if UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown) == nil or selectSortChanged == true then
+		UIDropDownMenu_SetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown, "__all");
 		selectSortChanged = nil
 	end
 end
 
 local function SortMethod_OnClick(self)
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, self.value);
+	UIDropDownMenu_SetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown, self.value);
 	selectSortChanged = true
 	ODC_SortFilter:Update("sort")
 	--local text = OfflineDataCenterFrameSortDropDownText;
@@ -89,7 +90,7 @@ end
 --function ODC:SortMenuInitialize(self)
 local function SortMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(ODC_SortFilter.SelectSortMethod) do
+	for k, v in pairs(SelectSortMethod) do
 		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L[k]
@@ -98,7 +99,7 @@ local function SortMenuInitialize(self, level)
 			UIDropDownMenu_AddButton(info, level)
 		end
 	end
-	UIDropDownMenu_SetSelectedValue(OfflineDataCenterFrameSortDropDown, "No sorting");
+	UIDropDownMenu_SetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown, "No sorting");
 	--local text = OfflineDataCenterFrameSortDropDownText;
 	--local width = text:GetStringWidth();
 	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameSortDropDown, width+40);
@@ -176,7 +177,7 @@ local function TooltipShow(self)--self=slot
 		return
 	end
 	local mIdx, aIdx = self.mailIndex, self.attachIndex
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 	--local sender, wasReturned
 	if method =="money" then
 			local x = self:GetRight();
@@ -393,11 +394,7 @@ local function InsertToIndexTable(keyword, mailIndex, attachIndex, method)
 	end
 end
 
-local function SelectSortMethod()
-
-end
-
-ODC_SortFilter.SelectSortMethod = {
+SelectSortMethod = {
 	["No sorting"] = function(mailIndex, attachIndex)
 		local keyword = L["No sorting"]
 		InsertToIndexTable(keyword, mailIndex, attachIndex, "no-sorting")	
@@ -508,11 +505,11 @@ local function Filter()
 	if not subIdxTb then return end
 	slotDB = {}
 	sumQuality = {}
-	local filter = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameFilterDropDown)
+	local filter = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown)
 	if not filter then filter = "__all" end
 	local c = 0
 	
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 	if method == "money" then
 		for i = 1, getn(subIdxTb[1]) do
 			c = c + 1
@@ -531,12 +528,14 @@ local function Filter()
 end
 
 local function SortDB()
-	local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
+	print("method="..(method or "nil"))
 	if not method then return end
 	subIdxTb = {}
 	--subIdxTb.method = method
 	revSubIdxTb = {__count = 0}
 	if not G_DB[selectChar] then return end --by eui.cc
+	print(playername);print(selectChar);print(selectTab)
 	if selectTab == "mail" then
 		if not G_DB[selectChar].itemCount then return end
 		for mailIndex = 1, G_DB[selectChar].mailCount do
@@ -585,7 +584,7 @@ local function SortDB()
 		end
 	end
 	if revSubIdxTb.__count == 0 then slotDB = nil; return end
-	UIDropDownMenu_Initialize(OfflineDataCenterFrameFilterDropDown, FilterMenuInitialize)
+	UIDropDownMenu_Initialize(ODCFrameSortFilterSubFrameFilterDropDown, FilterMenuInitialize)
 	Filter()
 end
 
@@ -597,7 +596,7 @@ local function UpdateContainer()
 		end
 	end
 	if not slotDB then return end
-	
+	print("hasslotDB")
 	local sumQ = ""
 	for i = 1, 7 do
 		if sumQuality[i] then
@@ -650,7 +649,7 @@ slotDB{		[1]		.mailIndex
 		local itemIndex = i + offset * 8
 		local slot = ODC.Frame.Container[i]
 		
-		local method = UIDropDownMenu_GetSelectedValue(OfflineDataCenterFrameSortDropDown)
+		local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 		----to clear this slot!
 		slot.count:SetText("")
 		slot.tex:SetTexture("")
@@ -832,7 +831,7 @@ function ODC_SortFilter:GameTooltip_OnTooltipSetItem(TT)
 	end		
 end
 
-function ODC_SortFilter:UpdateSearch()
+local function UpdateSearch()
 	local MIN_REPEAT_CHARACTERS = 3;
 	local searchString = ODC_SortFilter.Frame.searchingBar:GetText();
 	if (len(searchString) > MIN_REPEAT_CHARACTERS) then
@@ -844,7 +843,7 @@ function ODC_SortFilter:UpdateSearch()
 			end
 		end
 		if ( repeatChar ) then
-			ODC_SortFilter:SearchBarResetAndClear();
+			SearchBarResetAndClear();
 			ODC_SortFilter:Update();
 			return;
 		end
@@ -852,25 +851,22 @@ function ODC_SortFilter:UpdateSearch()
 	ODC_SortFilter:Update();
 end
 
-function ODC_SortFilter:OpenEditbox()
-	self.Frame.searchingBarText:Hide();
-	self.Frame.searchingBar:Show();
-	self.Frame.searchingBar:SetText(SEARCH);
-	self.Frame.searchingBar:HighlightText();
+local function OpenEditbox()
+	ODC_SortFilter.Frame.searchingBarText:Hide();
+	ODC_SortFilter.Frame.searchingBar:Show();
+	ODC_SortFilter.Frame.searchingBar:SetText(SEARCH);
+	ODC_SortFilter.Frame.searchingBar:HighlightText();
 end
 
-function ODC_SortFilter:SearchBarResetAndClear()
-	self.Frame.searchingBarText:Show();
-	self.Frame.searchingBar:ClearFocus();
-	self.Frame.searchingBar:SetText("");
+local function SearchBarResetAndClear()
+	ODC_SortFilter.Frame.searchingBarText:Show();
+	ODC_SortFilter.Frame.searchingBar:ClearFocus();
+	ODC_SortFilter.Frame.searchingBar:SetText("");
 end
 
 local function CreateSubFrame()
-	local name = "OfflineDataCenterFrame"
----- THE FOLLOWING CODE SHOULD BE MOVED TO MODULE ----
-	----local f = ODC:CreateSubFrame()
 	local p = ODC.Frame
-	local f = CreateFrame('Frame',name.."SortFilterSubFrame", p);
+	local f = CreateFrame('Frame',FRAMENAME, p);
 	f:SetPoint('TOPLEFT', 0, -40);
 	f:SetPoint('BOTTOMRIGHT', 0, 0);
 	ODC_SortFilter.Frame = f
@@ -911,12 +907,12 @@ local function CreateSubFrame()
 	button:SetAllPoints(f.searchingBarText);
 	button:SetScript("OnClick", function(self, btn)
 		if btn == "RightButton" then
-			ODC_SortFilter:OpenEditbox();
+			OpenEditbox();
 		else
 			if f.searchingBar:IsShown() then
-				ODC_SortFilter:SearchBarResetAndClear()
+				SearchBarResetAndClear()
 			else
-				ODC_SortFilter:OpenEditbox();
+				OpenEditbox();
 			end
 		end
 	end)
@@ -934,11 +930,11 @@ local function CreateSubFrame()
 
 	----Create sort dropdown menu
 	tinsert(UISpecialFrames, f)
-	f.sortmethod = CreateFrame('Frame', name..'SortDropDown', f, 'UIDropDownMenuTemplate')
+	f.sortmethod = CreateFrame('Frame', FRAMENAME..'SortDropDown', f, 'UIDropDownMenuTemplate')
 	f.sortmethod:SetPoint("BOTTOMLEFT", f.searchingBar, 0, -36)
 	
 	----Create filter dropdown menu
-	f.filter = CreateFrame('Frame', name..'FilterDropDown', f, 'UIDropDownMenuTemplate')
+	f.filter = CreateFrame('Frame', FRAMENAME..'FilterDropDown', f, 'UIDropDownMenuTemplate')
 	f.filter:SetPoint("LEFT", f.sortmethod, 150, 0)
 	
 	----Create mailbox gold text
@@ -957,7 +953,7 @@ local function CreateSubFrame()
 	-- f.checktime:SetPoint("BOTTOMLEFT", 20, 5);
 	
 	----Create scroll frame
-	f.scrollBar = CreateFrame("ScrollFrame", name.."ScrollBar", f, "FauxScrollFrameTemplate")
+	f.scrollBar = CreateFrame("ScrollFrame", FRAMENAME.."ScrollBar", f, "FauxScrollFrameTemplate")
 	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
 	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
 	f.scrollBar:SetHeight( Config.numItemsRows * Config.buttonSize + (Config.numItemsRows - 1) * Config.buttonSpacing)
@@ -977,13 +973,13 @@ local function CreateSubFrame()
 			S:HandleCheckBox(f.stackUpCheckButton);
 			S:HandleDropDownBox(f.sortmethod)
 			S:HandleDropDownBox(f.filter)
-			S:HandleScrollBar(_G[name.."ScrollBarScrollBar"])
+			S:HandleScrollBar(_G[FRAMENAME.."ScrollBarScrollBar"])
 		end
 	end
 	
 	----Create Container
 	f.Container = CreateFrame('Frame', nil, f);
-	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -30);-- -90);
+	f.Container:SetPoint('TOPLEFT', f, 'TOPLEFT', 12, -50);-- -90);
 	f.Container:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', 0, 8);
 	f.Container:Show()
 	
@@ -1049,7 +1045,7 @@ local function CreateSubFrame()
 	---- SetScript
 	
 	f.searchingBar:SetScript("OnEscapePressed", function()
-		ODC_SortFilter:SearchBarResetAndClear()
+		SearchBarResetAndClear()
 		ODC_SortFilter:Update()
 	end);
 	f.searchingBar:SetScript("OnEnterPressed", function()
@@ -1059,13 +1055,13 @@ local function CreateSubFrame()
 	f.searchingBar:SetScript("OnEditFocusLost", f.searchingBar.Hide);
 	f.searchingBar:SetScript("OnEditFocusGained", function(self)
 		self:HighlightText()
-		ODC_SortFilter:UpdateSearch()
+		UpdateSearch()
 	end);
 	f.searchingBar:SetScript("OnTextChanged", function()
-		ODC_SortFilter:UpdateSearch()
+		UpdateSearch()
 	end);
 	f.searchingBar:SetScript('OnChar', function()
-		ODC_SortFilter:UpdateSearch()
+		UpdateSearch()
 	end);
 	
 	f.scrollBar:SetScript("OnVerticalScroll",  function(self, offset)
@@ -1076,7 +1072,10 @@ local function CreateSubFrame()
 		ODC_SortFilter:Update()
 	end)
 	--UIDropDownMenu_Initialize(f.sortmethod, SortMenuInitialize)
----- THE CODE ABOVE SHOULD BE MOVED TO MODULE ----
+end
+
+local function UpdateSortMenu()
+	UIDropDownMenu_Initialize(ODC_SortFilter.Frame.sortmethod, SortMenuInitialize)
 end
 
 function ODC_SortFilter:CreateOrShowSubFrame(moduleName)
@@ -1086,17 +1085,14 @@ function ODC_SortFilter:CreateOrShowSubFrame(moduleName)
 	if not ODC.subFrame[moduleName] then
 		ODC.AddSubFrame(moduleName, ODC_SortFilter.Frame)
 	end
+	UpdateSortMenu()
 	ODC:ShowSubFrame (moduleName)
 end
 
-function ODC_SortFilter:UpdateSortMenu()
-	UIDropDownMenu_Initialize(ODC_SortFilter.Frame.sortmethod, SortMenuInitialize)
-end
-
-function ODC_SortFilter:Update(method)
+function ODC_SortFilter:Update(method)--, tabName)
 	if not ODC.Frame:IsVisible() then return end
 	if not selectChar then return end
-	
+	--selectTab = tabName
 	if selectTab == 'mail' then
 		G_DB = MB_DB
 	elseif selectTab == 'inventory' then
@@ -1106,9 +1102,8 @@ function ODC_SortFilter:Update(method)
 	else
 		return
 	end
-	
 	if method == "sort" then
-		self:SearchBarResetAndClear()
+		SearchBarResetAndClear()
 		SortDB()
 	elseif method == "filter" then
 		Filter()
@@ -1116,7 +1111,17 @@ function ODC_SortFilter:Update(method)
 	UpdateContainer()
 end
 
+local RefreshSelectedTabFunc = function(selectedTab)
+	selectTab = selectedTab
+end
+
+local RefreshSelectedCharFunc = function(selectedChar)
+	selectChar = selectedChar
+end
+
 function ODC_SortFilter:OnEnable()
+	ODC:AddFunc("sortFilter", "selectTabCallback", RefreshSelectedTabFunc)
+	ODC:AddFunc("sortFilter", "selectCharCallback", RefreshSelectedCharFunc)
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
 	ODC:AddModule(self)

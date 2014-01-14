@@ -15,25 +15,40 @@ ODC.playername = GetUnitName("player")..'-'..GetRealmName()
 ODC.selectChar = ODC.playername
 ODC.selectTab = nil
 
-ODC.module = {}
+--ODC.module = {}
 ODC.subFrame = {}
 ODC.TabTextures = {}
 ODC.TabTooltip = {}
-ODC.PopupMenu = {}
+--ODC.PopupMenu = {}
 ODC.TabChangedFunc = {}
 ODC.CharChangedFunc = {}
-
+ODC.TabChangedCallback = {}
+ODC.CharChangedCallback = {}
 
 ODC.config_const = {
 	frameWidth = 360,
 	frameHeight = 580,
 }
 
+local function SetSelectedTab()
+	for k, v in pairs(ODC.TabChangedCallback) do
+		ODC.TabChangedCallback[k](ODC.selectTab)
+	end
+end
+
+local function SetSelectedChar()
+	for k, v in pairs(ODC.CharChangedCallback) do
+		ODC.CharChangedCallback[k](ODC.selectChar)
+	end
+end
+
 local function ChooseChar_OnClick(self)
 	ODC.selectChar = self.value
+	SetSelectedChar()
+	--print("selectChar123"..(ODC.selectChar or ""))
 	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
-
-	ODC.CharChangedFunc[ODC.selectTab]()
+	--print("ChooseChar_OnClick"..(ODC.selectTab or ""))
+	ODC.CharChangedFunc[ODC.selectTab](ODC.selectChar)
 	
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
@@ -72,10 +87,19 @@ function ODC:ShowSubFrame (moduleName)
 	end 
 end
 
+function ODC:GetSelectedTab()
+	return self.selectTab
+end
+
+function ODC:GetSelectedChar()
+	return self.selectChar
+end
+
 ---- GUI ----
 
 function ODC:SetActiveTab(tabName, showFrame)
 	self.selectTab = tabName
+	SetSelectedTab()
 	if not MB_Config.toggle[tabName] then
 		print(ODC.TabTooltip[tabName]..'is not Enabled')
 		return;
@@ -90,7 +114,7 @@ function ODC:SetActiveTab(tabName, showFrame)
 	end
 	if showFrame then self:FrameShow() end
 	
-	self.TabChangedFunc[tabName]()
+	self.TabChangedFunc[tabName](tabName)
 
 end
 	
@@ -269,16 +293,35 @@ function ODC:FrameHide()
 	end
 end
 
-local OfflineDataCenterPopMenu = {
-	{text = L['Offline MailBox'],
-	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('mail', true) end},
-	{text = L['Offline Bag'],
-	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bag', true) end},
-	{text = L['Offline Bank'], 
-	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bank', true) end},
-	{text = L['Offline Character'], 
-	func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('inventory', true) end},
-}
+local OfflineDataCenterPopMenu = {}
+ -- = {
+	-- {text = L['Offline MailBox'],
+	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('mail', true) end},
+	-- {text = L['Offline Bag'],
+	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bag', true) end},
+	-- {text = L['Offline Bank'], 
+	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bank', true) end},
+	-- {text = L['Offline Character'], 
+	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('inventory', true) end},
+-- }
+
+local function AddPopMenu(TabTooltip)
+	for k, v in pairs(TabTooltip) do
+		local t = {text = v,
+			func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab(k, true) end},
+		tinsert(OfflineDataCenterPopMenu, t)
+	end
+end
+
+local function RemovePopMenu(TabTooltip)
+	for k, v in pairs(TabTooltip) do
+		for i, t in pairs(OfflineDataCenterPopMenu) do
+			if t.text == v then
+				t = nil
+			end
+		end
+	end
+end
 
 local function DropDown(list, frame, xOffset, yOffset)
 	if not frame.buttons then
@@ -447,6 +490,7 @@ function ODC:AddModule(module)
 			self.TabTooltip[k] = v
 		end
 		CreateFrameTab(ODC.Frame)
+		AddPopMenu(module.TabTooltip)
 	end
 	--self:SetActiveTab(selectTab)
 end
@@ -460,15 +504,22 @@ function ODC:RemoveModule(module)
 			self.TabTooltip[k] = nil
 		end
 		CreateFrameTab(ODC.Frame)
+		RemovePopMenu(module.TabTooltip)
 	end
 end
 -- ODC.TabChangedFunc = {}
 -- ODC.CharChangedFunc = {}
+-- ODC.TabChangedCallback = {}
+-- ODC.CharChangedCallback = {}
 function ODC:AddFunc(name, action, func)
 	if action == "selectTab" then
 		self.TabChangedFunc[name] = func
 	elseif action == "selectChar" then
 		self.CharChangedFunc[name] = func
+	elseif action == "selectTabCallback" then
+		self.TabChangedCallback[name] = func
+	elseif action == "selectCharCallback" then
+		self.CharChangedCallback[name] = func
 	end
 end
 
@@ -487,7 +538,6 @@ end
 
 function ODC:Toggle()
 	if MB_Config.toggle == nil then
-		print("toggled")
 		MB_Config.toggle = {
 			['mail'] = true,
 			['bag'] = true,
@@ -517,11 +567,11 @@ function ODC:Toggle()
 end
 		
 function ODC:OnInitialize()
-	if MB_Config == nil then MB_Config = {UI = {},player = {}} end
+	if MB_Config == nil then MB_Config = {UI = {},toggle = {}} end--,player = {}
 	--if MB_Config.UI == nil then MB_Config.UI = {} end
 	--MB_Config.player[ODC.playername] = true
 	
-	self:Toggle()
+	--self:Toggle()
 	CreateODCFrame()
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end

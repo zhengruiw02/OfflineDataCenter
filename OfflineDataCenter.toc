@@ -3,7 +3,7 @@
 ## Title: Offline Inventory
 ## Title-zhCN: 离线物品
 ## Title-zhTW: 離線物品
-## Version: alpha 30_4
+## Version: alpha 30_5
 ## SavedVariables: MB_DB, BB_DB, IN_DB, MB_Config
 
 Libs\LibStub\LibStub.lua

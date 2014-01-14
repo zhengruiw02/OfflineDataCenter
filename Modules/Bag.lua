@@ -72,22 +72,28 @@ end
 
 local SelectTabFuncBag = function()
 	ODC_SF:CreateOrShowSubFrame("bag")
-	ODC_SF:UpdateSortMenu()
-	ODC_SF:Update("sort")
+	ODC_SF:Update("sort","bag")
 end
 
 local SelectTabFuncBank = function()
 	ODC_SF:CreateOrShowSubFrame("bank")
-	ODC_SF:UpdateSortMenu()
-	ODC_SF:Update("sort")
+	ODC_SF:Update("sort","bank")
 end
 
 local SelectCharFuncBag = function()
-	ODC_SF:Update("sort")
+	ODC_SF:Update("sort","bag")
 end
 
 local SelectCharFuncBank = function()
-	ODC_SF:Update("sort")
+	ODC_SF:Update("sort","bank")
+end
+
+local RefreshSelectedTabFunc = function(selectedTab)
+	selectTab = selectedTab
+end
+
+local RefreshSelectedCharFunc = function(selectedChar)
+	selectChar = selectedChar
 end
 
 function ODC_Bag:OnEnable()
@@ -98,6 +104,8 @@ function ODC_Bag:OnEnable()
 	ODC:AddFunc("bank", "selectTab", SelectTabFuncBank)
 	ODC:AddFunc("bag", "selectChar", SelectCharFuncBag)
 	ODC:AddFunc("bank", "selectChar", SelectCharFuncBank)
+	ODC:AddFunc("bag", "selectTabCallback", RefreshSelectedTabFunc)
+	ODC:AddFunc("bag", "selectCharCallback", RefreshSelectedCharFunc)
 	if not BB_DB[playername] then BB_DB[playername] = {} end
 	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
 	self:RegisterEvent("BANKFRAME_OPENED")

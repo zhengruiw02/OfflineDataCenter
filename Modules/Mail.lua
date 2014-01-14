@@ -184,7 +184,7 @@ end
 
 local SelectTabFunc = function()
 	ODC_SF:CreateOrShowSubFrame("mail")
-	ODC_SF:UpdateSortMenu()
+	--ODC_SF:UpdateSortMenu()
 	ODC_SF:Update("sort")
 end
 
@@ -192,11 +192,21 @@ local SelectCharFunc = function()
 	ODC_SF:Update("sort")
 end
 
+local RefreshSelectedTabFunc = function(selectedTab)
+	selectTab = selectedTab
+end
+
+local RefreshSelectedCharFunc = function(selectedChar)
+	selectChar = selectedChar
+end
+
 function ODC_Mail:OnEnable()
 	MB_Config.toggle.mail = true
 	ODC:AddModule(self)
 	ODC:AddFunc("mail", "selectTab", SelectTabFunc)
 	ODC:AddFunc("mail", "selectChar", SelectCharFunc)
+	ODC:AddFunc("mail", "selectTabCallback", RefreshSelectedTabFunc)
+	ODC:AddFunc("mail", "selectCharCallback", RefreshSelectedCharFunc)
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:SecureHook('SendMail', 'HookSendMail');
 end
