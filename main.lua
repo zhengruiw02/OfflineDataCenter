@@ -15,15 +15,13 @@ ODC.playername = GetUnitName("player")..'-'..GetRealmName()
 ODC.selectChar = ODC.playername
 ODC.selectTab = nil
 
---ODC.module = {}
-ODC.subFrame = {}
-ODC.TabTextures = {}
-ODC.TabTooltip = {}
---ODC.PopupMenu = {}
-ODC.TabChangedFunc = {}
-ODC.CharChangedFunc = {}
+--[[
+ODC.tabs = { [tabName] = ...}
+[tabName] = { Textures, Tooltip, subFrame, CallTabFunc, CharChangedFunc }
+]]
 ODC.TabChangedCallback = {}
 ODC.CharChangedCallback = {}
+ODC.Tabs = {}
 
 ODC.config_const = {
 	frameWidth = 360,
@@ -45,10 +43,10 @@ end
 local function ChooseChar_OnClick(self)
 	ODC.selectChar = self.value
 	SetSelectedChar()
-	--print("selectChar123"..(ODC.selectChar or ""))
+
 	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
-	--print("ChooseChar_OnClick"..(ODC.selectTab or ""))
-	ODC.CharChangedFunc[ODC.selectTab](ODC.selectChar)
+
+	ODC.Tabs[ODC.selectTab].CharChangedFunc()
 	
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
@@ -58,8 +56,8 @@ end
 
 local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(BB_DB) do
-		if type(k) == 'string' and type(v) == 'table' then
+	for k, v in pairs(MB_Config.player) do --!! do not use BB_DB
+		if type(k) == 'string' then--and type(v) == 'table'
 			local info = UIDropDownMenu_CreateInfo()
 			info.text = k
 			info.value = k
@@ -76,23 +74,24 @@ local function ChooseCharMenuInitialize(self, level)
 	ODC.Frame.chooseChar:SetWidth(width+60)
 end
 
-function ODC:ShowSubFrame (moduleName)
-	local frameName = self.subFrame[moduleName]
-	for module, frame in pairs(self.subFrame) do
-		if ( frame ~= frameName ) then
-			_G[frame]:Hide();
-		else
-			_G[frame]:Show();
+function ODC:ShowSubFrame (tabName, subFrame)
+	local thisFrame = self.Tabs[tabName].subFrame
+
+	if not thisFrame then
+		self.Tabs[tabName].subFrame = subFrame
+		thisFrame = subFrame
+	end
+
+	for k, tab in pairs(self.Tabs) do
+		local frame = tab.subFrame
+		if frame ~= nil then
+			if ( frame ~= thisFrame ) then
+				frame:Hide();
+			else
+				frame:Show();
+			end
 		end
 	end 
-end
-
-function ODC:GetSelectedTab()
-	return self.selectTab
-end
-
-function ODC:GetSelectedChar()
-	return self.selectChar
 end
 
 ---- GUI ----
@@ -101,7 +100,7 @@ function ODC:SetActiveTab(tabName, showFrame)
 	self.selectTab = tabName
 	SetSelectedTab()
 	if not MB_Config.toggle[tabName] then
-		print(ODC.TabTooltip[tabName]..'is not Enabled')
+		print(ODC.Tabs[tabName].Tooltip..'is not Enabled')
 		return;
 	end
 
@@ -114,7 +113,7 @@ function ODC:SetActiveTab(tabName, showFrame)
 	end
 	if showFrame then self:FrameShow() end
 	
-	self.TabChangedFunc[tabName](tabName)
+	self.Tabs[tabName].CallTabFunc()
 
 end
 	
@@ -166,7 +165,7 @@ local function CreateODCFrame()
 	f.chooseChar = CreateFrame('Frame', name..'ChooseCharDropDown', f, 'UIDropDownMenuTemplate')
 	f.chooseChar:SetPoint("LEFT", f.title, f.title:GetStringWidth(), -5)
 	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
-	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameDropDown, 200);
+	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameChooseCharDropDown, 200);
 	
 	----Create close button
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
@@ -190,14 +189,11 @@ local function CreateODCFrame()
 	end
 end
 
-function ODC:AddSubFrame(moduleName, subFrame)
-	ODC.subFrame[moduleName] = subFrame
-end
-
 local function CreateFrameTab(f)
 	--tab button
 	local tabIndex = 1
-	for k , v in pairs(ODC.TabTextures) do
+	for k , v in pairs(ODC.Tabs) do
+		texture = v.Textures
 		if not MB_Config.toggle[k] then
 			if _G[f:GetName()..k..'Tab'] then
 				_G[f:GetName()..k..'Tab']:Hide()
@@ -210,7 +206,7 @@ local function CreateFrameTab(f)
 				--local S = ElvUI[1]:GetModule("Skins")
 				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
 				tab:DisableDrawLayer("BACKGROUND")
-				tab:SetNormalTexture(v)
+				tab:SetNormalTexture(texture)
 				tab:GetNormalTexture():ClearAllPoints()
 				tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
 				tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
@@ -221,18 +217,18 @@ local function CreateFrameTab(f)
 				tab:StyleButton()
 			else
 				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, (-48 * tabIndex) + 18)
-				tab:SetNormalTexture(v)
+				tab:SetNormalTexture(texture)
 			end	
 			tabIndex = tabIndex + 1
 			tab:SetAttribute("type", "spell")
 			tab:SetAttribute("spell", f:GetName())
-			tab.typeStr = k
+			tab.tabName = k
 			tab:SetScript("OnClick", function(self)
-				ODC:SetActiveTab(self.typeStr)
+				ODC:SetActiveTab(self.tabName)
 			end)
 			
 			tab.name = name
-			tab.tooltip = ODC.TabTooltip[k]
+			tab.tooltip = ODC.Tabs[k].Tooltip
 			tab:Show()
 		end
 	end
@@ -293,32 +289,27 @@ function ODC:FrameHide()
 	end
 end
 
-local OfflineDataCenterPopMenu = {}
- -- = {
-	-- {text = L['Offline MailBox'],
-	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('mail', true) end},
-	-- {text = L['Offline Bag'],
-	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bag', true) end},
-	-- {text = L['Offline Bank'], 
-	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('bank', true) end},
-	-- {text = L['Offline Character'], 
-	-- func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab('inventory', true) end},
--- }
-
-local function AddPopMenu(TabTooltip)
-	for k, v in pairs(TabTooltip) do
-		local t = {text = v,
-			func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab(k, true) end},
-		tinsert(OfflineDataCenterPopMenu, t)
+function ODC:ToggleWindow()
+	if self.Frame:IsVisible() then
+		self:FrameHide()
+	else
+		--self:Update("sort")
+		self:FrameShow()
 	end
 end
 
-local function RemovePopMenu(TabTooltip)
-	for k, v in pairs(TabTooltip) do
-		for i, t in pairs(OfflineDataCenterPopMenu) do
-			if t.text == v then
-				t = nil
-			end
+local OfflineDataCenterPopMenu = {}
+
+local function AddPopMenu(tabName, tabTooltip)
+	local t = {text = tabTooltip,
+		func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab(tabName, true) end},
+	tinsert(OfflineDataCenterPopMenu, t)
+end
+
+local function RemovePopMenu(tabTooltip)
+	for i, t in pairs(OfflineDataCenterPopMenu) do
+		if t.text == tabTooltip then
+			t = nil
 		end
 	end
 end
@@ -407,7 +398,7 @@ local function CreateElvUIBagToggleButton(name, parent)
 	f:SetFrameLevel(f:GetFrameLevel() + 2)
 	f:SetTemplate('Default')
 	f:StyleButton()
-	f:SetNormalTexture(ODC.TabTextures[name])
+	f:SetNormalTexture(ODC.Tabs[name].Textures)
 	f:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
 	f:GetNormalTexture():SetInside()
 	f:CreateBackdrop("Default")
@@ -418,7 +409,7 @@ local function CreateElvUIBagToggleButton(name, parent)
 	f:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self:GetParent(), "ANCHOR_TOP", 0, 4)
 		GameTooltip:ClearLines()
-		GameTooltip:AddLine(ODC.TabTooltip[name])
+		GameTooltip:AddLine(ODC.Tabs[name].Tooltip)
 		GameTooltip:Show()
 	end)
 	f:SetScript("OnLeave", function(self)
@@ -482,52 +473,70 @@ local function CreateToggleButton(f)
 end
 
 function ODC:AddModule(module)
-	if module.type == "tab" then
-		for k, v in pairs(module.TabTextures) do
-			self.TabTextures[k] = v
-		end
-		for k, v in pairs(module.TabTooltip) do
-			self.TabTooltip[k] = v
-		end
-		CreateFrameTab(ODC.Frame)
-		AddPopMenu(module.TabTooltip)
-	end
-	--self:SetActiveTab(selectTab)
+	self.TabChangedCallback[module.name] = module.selectTabCallbackFunc
+	self.CharChangedCallback[module.name] = module.selectCharCallbackFunc
 end
 
 function ODC:RemoveModule(module)
-	if module.type == "tab" then
-		for k, v in pairs(module.TabTextures) do
-			self.TabTextures[k] = nil
-		end
-		for k, v in pairs(module.TabTooltip) do
-			self.TabTooltip[k] = nil
-		end
-		CreateFrameTab(ODC.Frame)
-		RemovePopMenu(module.TabTooltip)
-	end
+	self.TabChangedCallback[module.name] = nil
+	self.CharChangedCallback[module.name] = nil
 end
--- ODC.TabChangedFunc = {}
--- ODC.CharChangedFunc = {}
--- ODC.TabChangedCallback = {}
--- ODC.CharChangedCallback = {}
-function ODC:AddFunc(name, action, func)
-	if action == "selectTab" then
-		self.TabChangedFunc[name] = func
-	elseif action == "selectChar" then
-		self.CharChangedFunc[name] = func
-	elseif action == "selectTabCallback" then
-		self.TabChangedCallback[name] = func
-	elseif action == "selectCharCallback" then
-		self.CharChangedCallback[name] = func
+
+function ODC:AddTab(tabName, tab)
+	self.Tabs[tabName] = tab
+	AddPopMenu(tabName, tab.Tooltip)
+	CreateFrameTab(self.Frame)
+end
+
+function ODC:RemoveTab(tabName)
+	self.Tabs[tabName] = nil
+	RemovePopMenu(tabName)
+	CreateFrameTab(self.Frame)
+end
+
+local function PrintCmdHelper()
+	print("help")
+end
+
+local function PrintTabState()
+	for k, v in pairs(MB_Config.toggle) do
+		if v then
+			print(k.." is enabled")
+		else
+			print(k.." is disabled")
+		end
 	end
 end
 
-function ODC:RemoveFunc(name, action)
-	if action == "selectTab" then
-		self.TabChangedFunc[name] = nil
-	elseif action == "selectChar" then
-		self.CharChangedFunc[name] = nil
+function ODC:EnableTab(tabName)
+	if not tabName then
+		PrintCmdHelper()
+	else
+	
+	end
+end
+
+function ODC:DisableTab(tabName)
+	if not tabName then
+		PrintCmdHelper()
+	else
+	
+	end
+end
+
+function ODC:SlashCmdHandler(param)
+	param = string.lower(param)
+	local _, _, arg1, arg2 = string.find(param, "(%a+)%s*(%a*)")
+	if arg1 == "toggle" then
+		self:ToggleWindow()
+	elseif arg1 == "enable" then
+		self:EnableTab(arg2)
+	elseif arg1 == "disable" then
+		self:DisableTab(arg2)
+	elseif arg1 == "state" then
+		PrintTabState()
+	else
+		PrintCmdHelper()
 	end
 end
 
@@ -535,43 +544,13 @@ function ODC:OpenBags()
 	CreateToggleButton(ElvUI_ContainerFrame)
 	CreateToggleButton(ContainerFrame1)
 end
-
-function ODC:Toggle()
-	if MB_Config.toggle == nil then
-		MB_Config.toggle = {
-			['mail'] = true,
-			['bag'] = true,
-			['bank'] = true,
-			['inventory'] = true,
-		}
-	end
-	
-	if true then return end
-	
-	local tabNumber = 0
-	self.selectTab = MB_Config.UI.activePage
-	for k, v in pairs(MB_Config.toggle) do
-		tabNumber = tabNumber + 1
-		if not self.selectTab then
-			self.selectTab = k
-		end
-	end
-
-	if tabNumber == 0 then 
-		if OfflineDataCenterFrame then OfflineDataCenterFrame:Hide() end
-	else
-		CreateODCFrame()
-		--CreateFrameTab(ODC.Frame)
-		--self:SetActiveTab(selectTab)
-	end
-end
 		
 function ODC:OnInitialize()
-	if MB_Config == nil then MB_Config = {UI = {},toggle = {}} end--,player = {}
-	--if MB_Config.UI == nil then MB_Config.UI = {} end
-	--MB_Config.player[ODC.playername] = true
-	
-	--self:Toggle()
+	if MB_Config == nil then MB_Config = {UI = {},toggle = {},player = {}} end
+
+	MB_Config.player[ODC.playername] = true
+	self.selectTab = MB_Config.UI.activePage or nil
+
 	CreateODCFrame()
 	if not MB_DB then MB_DB = {} end
 	if not BB_DB then BB_DB = {} end
@@ -580,14 +559,8 @@ function ODC:OnInitialize()
 	self:SecureHook('ToggleBag', 'OpenBags')
 	---- Slash command ----
 
-	SLASH_OFFLINEDATACENTER1 = "/mb";
-	SLASH_OFFLINEDATACENTER2 = "/odc";
-	SlashCmdList["OFFLINEDATACENTER"] = function()
-		if self.Frame:IsVisible() then
-			self:FrameHide()
-		else
-			--self:Update("sort")
-			self:FrameShow()
-		end
-	end;	
+	SLASH_OFFLINEDATACENTER1 = "/odc";
+	SlashCmdList["OFFLINEDATACENTER"] = function(param)
+		ODC:SlashCmdHandler(param)
+	end;
 end

@@ -5,15 +5,30 @@ local ODC_Bag = ODC:NewModule("OfflineBag", "AceEvent-3.0", "AceHook-3.0", "AceT
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 ODC_Bag.description = L["Offline Bag"]
 ODC_Bag.type = "tab"
-
-ODC_Bag.TabTextures = {
-	["bag"] = "Interface\\Buttons\\Button-Backpack-Up", 
-	["bank"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp", 
-}
-
-ODC_Bag.TabTooltip = {
-	["bag"] = L['Offline Bag'], 
-	["bank"] = L['Offline Bank'], 
+ODC_Bag.name = "OfflineBag"
+ODC_Bag.tabs = {
+	["bag"] = {
+		["Textures"] = "Interface\\Buttons\\Button-Backpack-Up",
+		["Tooltip"] = L['Offline Bag'],
+		["CallTabFunc"] = function()
+			ODC_SF:CreateOrShowSubFrame("bag")
+			ODC_SF:Update("sort")
+		end,
+		["CharChangedFunc"] = function()
+			ODC_SF:Update("sort")
+		end,
+	},
+	["bank"] = {
+		["Textures"] = "Interface\\ICONS\\ACHIEVEMENT_GUILDPERK_MOBILEBANKING.blp",
+		["Tooltip"] = L['Offline Bank'],
+		["CallTabFunc"] = function()
+			ODC_SF:CreateOrShowSubFrame("bank")
+			ODC_SF:Update("sort")
+		end,
+		["CharChangedFunc"] = function()
+			ODC_SF:Update("sort")
+		end,
+	},
 }
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
@@ -70,59 +85,57 @@ function ODC_Bag:BANKFRAME_CLOSED()
 	self.isBankOpened = nil
 end
 
-local SelectTabFuncBag = function()
-	ODC_SF:CreateOrShowSubFrame("bag")
-	ODC_SF:Update("sort","bag")
-end
-
-local SelectTabFuncBank = function()
-	ODC_SF:CreateOrShowSubFrame("bank")
-	ODC_SF:Update("sort","bank")
-end
-
-local SelectCharFuncBag = function()
-	ODC_SF:Update("sort","bag")
-end
-
-local SelectCharFuncBank = function()
-	ODC_SF:Update("sort","bank")
-end
-
-local RefreshSelectedTabFunc = function(selectedTab)
+ODC_Bag.selectTabCallbackFunc = function(selectedTab)
 	selectTab = selectedTab
 end
 
-local RefreshSelectedCharFunc = function(selectedChar)
+ODC_Bag.selectCharCallbackFunc = function(selectedChar)
 	selectChar = selectedChar
 end
 
+function ODC_Bag:OnInitialize()
+	if not MB_Config.toggle.bag then MB_Config.toggle.bag = true end
+	if not MB_Config.toggle.bank then MB_Config.toggle.bank = true end
+end
+
 function ODC_Bag:OnEnable()
-	MB_Config.toggle.bag = true
-	MB_Config.toggle.bank = true
-	ODC:AddModule(self)
-	ODC:AddFunc("bag", "selectTab", SelectTabFuncBag)
-	ODC:AddFunc("bank", "selectTab", SelectTabFuncBank)
-	ODC:AddFunc("bag", "selectChar", SelectCharFuncBag)
-	ODC:AddFunc("bank", "selectChar", SelectCharFuncBank)
-	ODC:AddFunc("bag", "selectTabCallback", RefreshSelectedTabFunc)
-	ODC:AddFunc("bag", "selectCharCallback", RefreshSelectedCharFunc)
-	if not BB_DB[playername] then BB_DB[playername] = {} end
-	if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	self:RegisterEvent("BANKFRAME_OPENED")
-	self:RegisterEvent("BANKFRAME_CLOSED")
-	self:RegisterEvent("BAG_UPDATE_DELAYED")
+	if MB_Config.toggle.bag or MB_Config.toggle.bank then
+		ODC:AddModule(self)
+		self:RegisterEvent("BAG_UPDATE_DELAYED")
+		if not BB_DB[playername] then
+			BB_DB[playername] = {}
+			self:CheckBags()
+		end
+		if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
+	end
+	if MB_Config.toggle.bag then
+		ODC:AddTab("bag", self.tabs["bag"])
+	end
+	if MB_Config.toggle.bank then
+		ODC:AddTab("bank", self.tabs["bank"])
+		self:RegisterEvent("BANKFRAME_OPENED")
+		self:RegisterEvent("BANKFRAME_CLOSED")
+	end
 	-- self:SecureHook('OpenAllBags', 'OpenBags')
 	-- self:SecureHook('ToggleBag', 'OpenBags')
 end
 
 function ODC_Bag:OnDisable()
-	MB_Config.toggle.bag = false
-	MB_Config.toggle.bank = false
-	ODC:RemoveModule(self)
-	ODC:RemoveFunc("bag", "selectTab")
-	ODC:RemoveFunc("bank", "selectTab")
-	ODC:RemoveFunc("bag", "selectChar")
-	ODC:RemoveFunc("bank", "selectChar")
+	if not MB_Config.toggle.bag then
+		ODC:RemoveTab("bag")
+	end
+	if not MB_Config.toggle.bank then
+		ODC:RemoveTab("bank")
+		self:UnregisterEvent("BANKFRAME_OPENED")
+		self:UnregisterEvent("BANKFRAME_CLOSED")
+	end
+	if not MB_Config.toggle.bag and not MB_Config.toggle.bank then
+		ODC:RemoveModule(self)
+		self:UnhookAll()
+		-- self:UnregisterEvent("BAG_UPDATE_DELAYED")
+	end
+	-- MB_Config.toggle.bag = false
+	-- MB_Config.toggle.bank = false
 	-- self:UnhookAll()
 	-- self:UnregisterEvent("BANKFRAME_OPENED")
 	-- self:UnregisterEvent("BANKFRAME_CLOSED")	

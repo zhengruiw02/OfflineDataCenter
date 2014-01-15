@@ -3,6 +3,7 @@ local ODC_SortFilter = ODC:NewModule("SortFilter", "AceEvent-3.0", "AceHook-3.0"
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 --ODC_SortFilter.description = L["Offline Bag"]
 ODC_SortFilter.type = "subFrame"
+ODC_SortFilter.name = "SortFilter"
 
 local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
@@ -1078,18 +1079,16 @@ local function UpdateSortMenu()
 	UIDropDownMenu_Initialize(ODC_SortFilter.Frame.sortmethod, SortMenuInitialize)
 end
 
-function ODC_SortFilter:CreateOrShowSubFrame(moduleName)
+function ODC_SortFilter:CreateOrShowSubFrame(tabName)
 	if not self.Frame then
 		CreateSubFrame()
 	end
-	if not ODC.subFrame[moduleName] then
-		ODC.AddSubFrame(moduleName, ODC_SortFilter.Frame)
-	end
+
 	UpdateSortMenu()
-	ODC:ShowSubFrame (moduleName)
+	ODC:ShowSubFrame(tabName, ODC_SortFilter.Frame)
 end
 
-function ODC_SortFilter:Update(method)--, tabName)
+function ODC_SortFilter:Update(method)
 	if not ODC.Frame:IsVisible() then return end
 	if not selectChar then return end
 	--selectTab = tabName
@@ -1111,25 +1110,25 @@ function ODC_SortFilter:Update(method)--, tabName)
 	UpdateContainer()
 end
 
-local RefreshSelectedTabFunc = function(selectedTab)
+ODC_SortFilter.selectTabCallbackFunc = function(selectedTab)
 	selectTab = selectedTab
 end
 
-local RefreshSelectedCharFunc = function(selectedChar)
+ODC_SortFilter.selectCharCallbackFunc = function(selectedChar)
 	selectChar = selectedChar
 end
 
+-- function ODC_SortFilter:OnInitialize()
+	-- CreateSubFrame()
+-- end
+
 function ODC_SortFilter:OnEnable()
-	ODC:AddFunc("sortFilter", "selectTabCallback", RefreshSelectedTabFunc)
-	ODC:AddFunc("sortFilter", "selectCharCallback", RefreshSelectedCharFunc)
+	ODC:AddModule(self)
 	self:HookScript(GameTooltip, 'OnTooltipSetItem', 'GameTooltip_OnTooltipSetItem')
 	self:HookScript(GameTooltip, 'OnTooltipCleared', 'GameTooltip_OnTooltipCleared')
-	ODC:AddModule(self)
-	--self:CreateSubFrame()
 end
 
 function ODC_SortFilter:OnDisable()
 	-- self:UnhookAll()
 	ODC:RemoveModule(self)
-	
 end

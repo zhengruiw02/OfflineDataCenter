@@ -5,13 +5,19 @@ local ODC_Mail = ODC:NewModule("OfflineMail", "AceEvent-3.0", "AceHook-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 ODC_Mail.description = L["Offline MailBox"]
 ODC_Mail.type = "tab"
-
-ODC_Mail.TabTextures = {
-	["mail"] = "Interface\\MailFrame\\Mail-Icon.blp",
-}
-
-ODC_Mail.TabTooltip = {
-	["mail"] = L['Offline MailBox'],
+ODC_Mail.name = "OfflineMail"
+ODC_Mail.tabs = {
+	["mail"] = {
+		["Textures"] = "Interface\\MailFrame\\Mail-Icon.blp",
+		["Tooltip"] = L['Offline MailBox'],
+		["CallTabFunc"] = function()
+			ODC_SF:CreateOrShowSubFrame("mail")
+			ODC_SF:Update("sort")
+		end,
+		["CharChangedFunc"] = function()
+			ODC_SF:Update("sort")
+		end,
+	}
 }
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
@@ -176,46 +182,33 @@ function ODC_Mail:MAIL_INBOX_UPDATE()
 end
 
 function ODC_Mail:OnInitialize()
+	if not MB_Config.toggle.mail then MB_Config.toggle.mail = true end
 	if not MB_DB[playername] then MB_DB[playername] = {mailCount = 0, itemCount = 0, money = 0} end
 	if MB_Config.toggle.mail then
 		AlertDeadlineMails()
 	end
 end
 
-local SelectTabFunc = function()
-	ODC_SF:CreateOrShowSubFrame("mail")
-	--ODC_SF:UpdateSortMenu()
-	ODC_SF:Update("sort")
-end
-
-local SelectCharFunc = function()
-	ODC_SF:Update("sort")
-end
-
-local RefreshSelectedTabFunc = function(selectedTab)
+ODC_Mail.selectTabCallbackFunc = function(selectedTab)
 	selectTab = selectedTab
 end
 
-local RefreshSelectedCharFunc = function(selectedChar)
+ODC_Mail.selectCharCallbackFunc = function(selectedChar)
 	selectChar = selectedChar
 end
 
 function ODC_Mail:OnEnable()
-	MB_Config.toggle.mail = true
+	if not MB_Config.toggle.mail then return end
 	ODC:AddModule(self)
-	ODC:AddFunc("mail", "selectTab", SelectTabFunc)
-	ODC:AddFunc("mail", "selectChar", SelectCharFunc)
-	ODC:AddFunc("mail", "selectTabCallback", RefreshSelectedTabFunc)
-	ODC:AddFunc("mail", "selectCharCallback", RefreshSelectedCharFunc)
+	ODC:AddTab("mail", self.tabs["mail"])
 	self:RegisterEvent("MAIL_INBOX_UPDATE")
 	self:SecureHook('SendMail', 'HookSendMail');
 end
 
 function ODC_Mail:OnDisable()
-	MB_Config.toggle.mail = false
+	--MB_Config.toggle.mail = false
 	ODC:RemoveModule(self)
-	ODC:RemoveFunc("mail", "selectTab")
-	ODC:RemoveFunc("mail", "selectTab")
-	-- self:UnhookAll()	
+	ODC:RemoveTab("mail")
+	self:UnhookAll()
 	-- self:UnregisterEvent("MAIL_INBOX_UPDATE")
 end
