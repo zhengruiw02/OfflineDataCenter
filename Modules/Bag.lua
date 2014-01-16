@@ -33,36 +33,45 @@ ODC_Bag.tabs = {
 
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
 
-local function AddItemBag(itemLink, count, bagID, slotID)
-	BB_DB[playername][bagID][slotID] = {count = count, itemLink = itemLink}
+local function AddItem(itemLink, bagID, slotID)
+	local dest
+	if bagID <= 4 and bagID >= 0 then
+		dest = "bag"
+	else
+		dest = "bank"
+	end
+	if not ODC_DB[playername][dest][bagID] then
+		local numSlots = GetContainerNumSlots(bagID)
+		ODC_DB[playername][dest][bagID] = {slotMAX = numSlots}
+	end
+	if not itemLink then
+		ODC_DB[playername][dest][bagID][slotID] = nil
+	else
+		local _, count, _, _, _ = GetContainerItemInfo(bagID, slotID)
+		ODC_DB[playername][dest][bagID][slotID] = {count = count, itemLink = itemLink}
+	end
 end
+
 --[[
-BB_DB structure:
+ODC_DB[charName] structure:
 				bagID		slotID
-[charName] = {	[1]			[1]			{	.count
-				[n]			.slotMAX		.itemLink
+["bag/bank"]= {	[1]			[1]			{	.count
+				[n]			--.slotMAX		.itemLink
 				.itemCountBank?
 				.itemCountBag?
 ]]
 function ODC_Bag:CheckBags()
-	if not BB_DB[playername] then BB_DB[playername] = {} end
 	local BagIDs = self.isBankOpened and {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} or {0, 1, 2, 3, 4}
 	local numSlots, full = GetNumBankSlots();
-	BB_DB[playername].money = GetMoney()
+	ODC_DB[playername]["bag"].money = GetMoney()
 	for k, bagID in pairs(BagIDs) do
 		local numSlots = GetContainerNumSlots(bagID)
 		if numSlots > 0 then
-			BB_DB[playername][bagID] = {slotMAX = numSlots}
-			-- local inbagItemCount = 0
+			--ODC_DB[playername]["bag\bank"][bagID] = {slotMAX = numSlots}
 			for slotIndex = 1, numSlots do
 				local itemLink = GetContainerItemLink(bagID, slotIndex)
-				if itemLink then
-					local _, count, _, _, _ = GetContainerItemInfo(bagID, slotIndex)
-					AddItemBag(itemLink, count, bagID, slotIndex)
-					-- inbagItemCount = inbagItemCount + 1
-				end
+				AddItem(itemLink, bagID, slotIndex)
 			end
-			-- BB_DB[playername][bagID].inbagItemCount = inbagItemCount
 		end
 	end
 	
@@ -94,48 +103,56 @@ ODC_Bag.selectCharCallbackFunc = function(selectedChar)
 end
 
 function ODC_Bag:OnInitialize()
-	if not MB_Config.toggle.bag then MB_Config.toggle.bag = true end
-	if not MB_Config.toggle.bank then MB_Config.toggle.bank = true end
+	if ODC_Config.toggle.bag == nil then ODC_Config.toggle.bag = true end
+	if ODC_Config.toggle.bank == nil then ODC_Config.toggle.bank = true end
+	ODC:AddAvaliableTab("bag", self)
+	ODC:AddAvaliableTab("bank", self)
 end
 
 function ODC_Bag:OnEnable()
-	if MB_Config.toggle.bag or MB_Config.toggle.bank then
-		ODC:AddModule(self)
-		self:RegisterEvent("BAG_UPDATE_DELAYED")
-		if not BB_DB[playername] then
-			BB_DB[playername] = {}
+
+	if ODC_Config.toggle.bag then
+		if not ODC_DB[playername]["bag"] then
+			ODC_DB[playername]["bag"] = {}
 			self:CheckBags()
 		end
-		if not BB_DB[playername].money then BB_DB[playername].money = GetMoney() or 0 end
-	end
-	if MB_Config.toggle.bag then
+		if not ODC_DB[playername]["bag"].money then
+			ODC_DB[playername]["bag"].money = GetMoney() or 0
+		end
 		ODC:AddTab("bag", self.tabs["bag"])
 	end
-	if MB_Config.toggle.bank then
+	if ODC_Config.toggle.bank then
+		if not ODC_DB[playername]["bank"] then
+			ODC_DB[playername]["bank"] = {}
+		end
 		ODC:AddTab("bank", self.tabs["bank"])
 		self:RegisterEvent("BANKFRAME_OPENED")
 		self:RegisterEvent("BANKFRAME_CLOSED")
+	end
+	if ODC_Config.toggle.bag or ODC_Config.toggle.bank then
+		ODC:AddModule(self)
+		self:RegisterEvent("BAG_UPDATE_DELAYED")
 	end
 	-- self:SecureHook('OpenAllBags', 'OpenBags')
 	-- self:SecureHook('ToggleBag', 'OpenBags')
 end
 
 function ODC_Bag:OnDisable()
-	if not MB_Config.toggle.bag then
+	if not ODC_Config.toggle.bag then
 		ODC:RemoveTab("bag")
 	end
-	if not MB_Config.toggle.bank then
+	if not ODC_Config.toggle.bank then
 		ODC:RemoveTab("bank")
 		self:UnregisterEvent("BANKFRAME_OPENED")
 		self:UnregisterEvent("BANKFRAME_CLOSED")
 	end
-	if not MB_Config.toggle.bag and not MB_Config.toggle.bank then
+	if not ODC_Config.toggle.bag and not ODC_Config.toggle.bank then
 		ODC:RemoveModule(self)
 		self:UnhookAll()
 		-- self:UnregisterEvent("BAG_UPDATE_DELAYED")
 	end
-	-- MB_Config.toggle.bag = false
-	-- MB_Config.toggle.bank = false
+	-- ODC_Config.toggle.bag = false
+	-- ODC_Config.toggle.bank = false
 	-- self:UnhookAll()
 	-- self:UnregisterEvent("BANKFRAME_OPENED")
 	-- self:UnregisterEvent("BANKFRAME_CLOSED")	

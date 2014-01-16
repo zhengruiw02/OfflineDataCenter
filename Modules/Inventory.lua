@@ -24,29 +24,25 @@ local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.se
 
 local function AddItemEquipped(itemLink, slotID)
 	if not itemLink then
-		IN_DB[playername][1][slotID] = nil
+		ODC_DB[playername]["inventory"][1][slotID] = nil
 	else
-		IN_DB[playername][1][slotID] = {count = 1, itemLink = itemLink}
+		ODC_DB[playername]["inventory"][1][slotID] = {count = 1, itemLink = itemLink}
 	end
 end
 --[[
-IN_DB structure:
+ODC_DB["inventory"] structure:
 							INVSLOT
 [charName] = {	[1]		{	[1]			{	.count
 							[2]				.itemLink
-				["stat"]{	.stat1
+				--["stat"]{	.stat1
 							.statN
 ]]
 function ODC_Inventory:CheckEquipped()
-	if not IN_DB[playername] then
-		IN_DB[playername] = {}
-		IN_DB[playername][1] = {}
-	end
 	for slotID = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
 		local link = GetInventoryItemLink("player", slotID);
 		AddItemEquipped(link, slotID)
 	end
-	
+
 	if ODC.Frame:IsVisible() and selectChar == playername and selectTab == "inventory" then
 		ODC_SF:Update("sort")
 	end
@@ -64,30 +60,34 @@ function ODC_Inventory:REPLACE_ENCHANT()
 	self:CheckEquipped()
 end
 
-local RefreshSelectedTabFunc = function(selectedTab)
+ODC_Inventory.selectTabCallbackFunc = function(selectedTab)
 	selectTab = selectedTab
 end
 
-local RefreshSelectedCharFunc = function(selectedChar)
+ODC_Inventory.selectCharCallbackFunc = function(selectedChar)
 	selectChar = selectedChar
 end
 
 function ODC_Inventory:OnInitialize()
-	if not MB_Config.toggle.inventory then MB_Config.toggle.inventory = true end
+	if ODC_Config.toggle.inventory == nil then ODC_Config.toggle.inventory = true end
+	ODC:AddAvaliableTab("inventory", self)
 end
 
 function ODC_Inventory:OnEnable()
-	if not MB_Config.toggle.inventory then return end
+	if not ODC_Config.toggle.inventory then return end
 	ODC:AddModule(self)
 	ODC:AddTab("inventory", self.tabs["inventory"])
-	if not IN_DB[playername] then self:CheckEquipped() end
+	if not ODC_DB[playername]["inventory"] then
+		ODC_DB[playername]["inventory"] = {[1] = {}}
+		self:CheckEquipped()
+	end
 	self:RegisterEvent("UNIT_INVENTORY_CHANGED");
 	self:RegisterEvent("REPLACE_ENCHANT");
 	self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE");
 end
 
 function ODC_Inventory:OnDisable()
-	if MB_Config.toggle.inventory then return end
+	if ODC_Config.toggle.inventory then return end
 	ODC:RemoveModule(self)
 	ODC:RemoveTab("inventory")
 	self:UnhookAll()

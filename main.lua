@@ -5,7 +5,6 @@
 --@@ TODO: should attachments be alerted to player to collect when almost in deadline?
 	--UC.. to optimize
 
---@@ TODO: optimize & combine same action in function Filter() UpdateRevIdxTb() InsToIdxTb()
 local ODC = LibStub("AceAddon-3.0"):NewAddon("OfflineDataCenter", "AceHook-3.0", "AceEvent-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale("OfflineDataCenter")
 local getn, tinsert = table.getn, table.insert
@@ -22,6 +21,7 @@ ODC.tabs = { [tabName] = ...}
 ODC.TabChangedCallback = {}
 ODC.CharChangedCallback = {}
 ODC.Tabs = {}
+ODC.TabsAvaliable = {}
 
 ODC.config_const = {
 	frameWidth = 360,
@@ -56,8 +56,8 @@ end
 
 local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(MB_Config.player) do --!! do not use BB_DB
-		if type(k) == 'string' then--and type(v) == 'table'
+	for k, v in pairs(ODC_Config.player) do
+		if type(k) == 'string' then
 			local info = UIDropDownMenu_CreateInfo()
 			info.text = k
 			info.value = k
@@ -98,13 +98,14 @@ end
 
 function ODC:SetActiveTab(tabName, showFrame)
 	self.selectTab = tabName
+	ODC_Config.UI.activePage = tabName
 	SetSelectedTab()
-	if not MB_Config.toggle[tabName] then
+	if not ODC_Config.toggle[tabName] then
 		print(ODC.Tabs[tabName].Tooltip..'is not Enabled')
 		return;
 	end
 
-	for k, v in pairs(MB_Config.toggle) do
+	for k, v in pairs(ODC_Config.toggle) do
 		if k == tabName then
 			_G["OfflineDataCenterFrame"..k..'Tab']:SetChecked(true)
 		elseif v then
@@ -122,7 +123,7 @@ local function CreateODCFrame()
 	local name = "OfflineDataCenterFrame"
 	local f = CreateFrame("Frame", name , UIParent)
 	ODC.Frame = f
-	if MB_Config.UI == nil then MB_Config.UI = {} end
+	if ODC_Config.UI == nil then ODC_Config.UI = {} end
 	
 	if ElvUI then
 		f:SetTemplate(ElvUI[1].db.bags.transparent and "notrans" or "Transparent")
@@ -139,7 +140,7 @@ local function CreateODCFrame()
 	f:SetClampedToScreen(true)
 	f:SetWidth(ODC.config_const.frameWidth)
 	f:SetHeight(ODC.config_const.frameHeight)
-	f:SetPoint(MB_Config.UI.pa or "CENTER", MB_Config.UI.px or 0, MB_Config.UI.py or 0)
+	f:SetPoint(ODC_Config.UI.pa or "CENTER", ODC_Config.UI.px or 0, ODC_Config.UI.py or 0)
 	f:SetMovable(true)
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", function(self)
@@ -147,7 +148,7 @@ local function CreateODCFrame()
 	end)
 	f:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		MB_Config.UI.p, MB_Config.UI.pf, MB_Config.UI.pa, MB_Config.UI.px, MB_Config.UI.py = self:GetPoint()
+		ODC_Config.UI.p, ODC_Config.UI.pf, ODC_Config.UI.pa, ODC_Config.UI.px, ODC_Config.UI.py = self:GetPoint()
 	end)
 	f:Hide()
 	
@@ -194,7 +195,7 @@ local function CreateFrameTab(f)
 	local tabIndex = 1
 	for k , v in pairs(ODC.Tabs) do
 		texture = v.Textures
-		if not MB_Config.toggle[k] then
+		if not ODC_Config.toggle[k] then
 			if _G[f:GetName()..k..'Tab'] then
 				_G[f:GetName()..k..'Tab']:Hide()
 				_G[f:GetName()..k..'Tab'] = nil
@@ -283,7 +284,7 @@ end
 
 function ODC:FrameHide()
 	self.Frame:Hide()
-	MB_Config.UI.activePage = self.selectTab
+	ODC_Config.UI.activePage = self.selectTab
 	if not InCombatLockdown() then
 		collectgarbage("collect")
 	end
@@ -445,17 +446,19 @@ local function CreateToggleButton(f)
 		return ContainerFrame1PortraitButton
 	end
 
-	if ElvUI and not f.offlineButton then
+	if ElvUI then --and not f.offlineButton
 		f.offlineButton = {}
 		--offline button
-		if MB_Config.toggle.bag then
+		if ODC_Config.toggle.bag then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bag', f))
+		end
+		if ODC_Config.toggle.bank then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bank', f))
 		end
-		if MB_Config.toggle.mail then
+		if ODC_Config.toggle.mail then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('mail', f))
 		end
-		if MB_Config.toggle.inventory then
+		if ODC_Config.toggle.inventory then
 			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f))
 		end
 		if #f.offlineButton > 0 then
@@ -494,12 +497,20 @@ function ODC:RemoveTab(tabName)
 	CreateFrameTab(self.Frame)
 end
 
+function ODC:AddAvaliableTab(tabName, module)
+	self.TabsAvaliable[tabName] = module
+end
+
 local function PrintCmdHelper()
-	print("help")
+	print("Unknow ODC command! ODC command helper:\n"..
+	"/ODC toggle: to toggle ODC window\n"..
+	"/ODC enable [tab name]: to enable [tab name]\n"..
+	"/ODC disable [tab name]: to disable [tab name]\n"..
+	"/ODC state: to show tabs state\n")
 end
 
 local function PrintTabState()
-	for k, v in pairs(MB_Config.toggle) do
+	for k, v in pairs(ODC_Config.toggle) do
 		if v then
 			print(k.." is enabled")
 		else
@@ -511,16 +522,24 @@ end
 function ODC:EnableTab(tabName)
 	if not tabName then
 		PrintCmdHelper()
+	elseif ODC_Config.toggle[tabName] == nil then
+		print("Tab name does not exist!")
+		PrintTabState()
 	else
-	
+		ODC_Config.toggle[tabName] = true
+		self.TabsAvaliable[tabName]:OnEnable()
 	end
 end
 
 function ODC:DisableTab(tabName)
 	if not tabName then
 		PrintCmdHelper()
+	elseif ODC_Config.toggle[tabName] == nil then
+		print("Tab name does not exist!")
+		PrintTabState()
 	else
-	
+		ODC_Config.toggle[tabName] = false
+		self.TabsAvaliable[tabName]:OnDisable()
 	end
 end
 
@@ -546,15 +565,15 @@ function ODC:OpenBags()
 end
 		
 function ODC:OnInitialize()
-	if MB_Config == nil then MB_Config = {UI = {},toggle = {},player = {}} end
-
-	MB_Config.player[ODC.playername] = true
-	self.selectTab = MB_Config.UI.activePage or nil
+	if ODC_Config == nil then ODC_Config = {UI = {},toggle = {},player = {}} end
+	if ODC_DB == nil then ODC_DB = {} end
+	if ODC_DB[ODC.playername] == nil then ODC_DB[ODC.playername] = {} end
+	
+	ODC_Config.player[ODC.playername] = true
+	self.selectTab = ODC_Config.UI.activePage or nil
 
 	CreateODCFrame()
-	if not MB_DB then MB_DB = {} end
-	if not BB_DB then BB_DB = {} end
-	if not IN_DB then IN_DB = {} end
+
 	self:SecureHook('OpenAllBags', 'OpenBags')
 	self:SecureHook('ToggleBag', 'OpenBags')
 	---- Slash command ----
