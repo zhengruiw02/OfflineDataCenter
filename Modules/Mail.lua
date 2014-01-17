@@ -52,15 +52,13 @@ local function AddItemMail(itemLink, count, mailIndex, attachIndex, sender, days
 end
 --[[
 new structure:
-[charName]				mailIndex	attachIndex
-["mail"] = {	[1]			[1]			{	.count
-				[n]			.sender			.itemLink
-							.daysLeft
-							.wasReturned
-							.CODAmount?
-							.money?
-				--.mailCount
-				--.itemCount
+[charName]		mailIndex		attachIndex
+["mail"] = {	[1]				[1]			{	.count
+				[n]				.sender			.itemLink
+				.checkMailTick	.daysLeft
+								.wasReturned
+								.CODAmount?
+								.money?
 enum:
 for i = 1, getn(mailIndex) do
 	curr.sender, curr.daysLeft, curr.wasReturned, curr.CODAmount

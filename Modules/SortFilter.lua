@@ -7,7 +7,7 @@ ODC_SortFilter.name = "SortFilter"
 
 local len, sub, find, format, match = string.len, string.sub, string.find, string.format, string.match
 local playername, selectChar, selectTab = ODC.playername, ODC.selectChar, ODC.selectTab
-local G_DB, slotDB, subIdxTb, revSubIdxTb, sumQuality
+local G_DB, slotDB, subIdxTb, sumQuality
 local selectSortChanged, isStacked
 local codMoney, codMailIndex, codAttachmentIndex
 local FRAMENAME = "ODCFrameSortFilterSubFrame"
@@ -27,19 +27,6 @@ local Config = {
 	-- frameHeight = 580,
 }
 
-local function BuildSortOrder()
-	AhSortIndex = {__count = 0}
-	--local c = 0;
-	for i, iType in ipairs({GetAuctionItemClasses()}) do
-		AhSortIndex[iType] = i
-		AhSortIndex.__count = AhSortIndex.__count + 1
-		-- for ii, isType in ipairs({GetAuctionItemSubClasses(i)}) do
-			-- c = c + 1;
-			-- AhSortIndex[isType] = c;
-		-- end
-	end
-end
-
 local function CalcLeftDay(player, mailIndex)
 	return floor(difftime(floor(ODC_DB[player]["mail"][mailIndex].daysLeft * 86400) + ODC_DB[player]["mail"].checkMailTick,time()) / 86400)
 end
@@ -48,175 +35,98 @@ local function GetItemID(itemLink)
 	return tonumber(match(itemLink, "item:(%d+)"))
 end
 
-local function UpdateRevIndexTable(keyword, method) --keyword as [sender], "uncommom"
-	local insertIndex
-	if revSubIdxTb.__count == 0 then --table is nil(money can add only once)
-		revSubIdxTb.__count = revSubIdxTb.__count + 1
-		insertIndex = revSubIdxTb.__count
-	elseif not method then --add to last
-		revSubIdxTb.__count = revSubIdxTb.__count + 1
-		insertIndex = revSubIdxTb.__count
-	elseif method == "AH" then--table is not empty
-		local AhIndex = AhSortIndex[keyword]
-		if not AhIndex then
-			AhSortIndex.__count = AhSortIndex.__count + 1
-			AhSortIndex[keyword] = AhSortIndex.__count
-			AhIndex = AhSortIndex.__count
-			
-		end
-		for i, v in ipairs(subIdxTb) do --table is not empty
-			
-			if AhSortIndex[subIdxTb[i].keyword] > AhIndex then --can insert before end of table
-				for ii = i, revSubIdxTb.__count do --move items after current key
-					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
-				end
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = i
-				break
-			elseif i == getn(subIdxTb) then --insert to end of table
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = revSubIdxTb.__count
-				break
-			end
-		end
-	elseif method == "quality" or method == "left day" then --keyword is sortable
-		for i, v in ipairs(subIdxTb) do --table is not empty
-			if subIdxTb[i].keyword > keyword then --can insert before end of table
-				for ii = i, revSubIdxTb.__count do --move items after current key
-					revSubIdxTb[subIdxTb[ii].keyword] = ii + 1
-				end
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = i
-				break
-			elseif i == getn(subIdxTb) then --insert to end of table
-				revSubIdxTb.__count = revSubIdxTb.__count + 1
-				insertIndex = revSubIdxTb.__count
-				break
-			end
-		end
+local function InsertToIndexTable(keyword, x, y, method)
+	if not keyword or not x then return end
+	if not subIdxTb then subIdxTb = {} end
+	if not subIdxTb[keyword] then
+		subIdxTb[keyword] = {}
 	end
-	revSubIdxTb[keyword] = insertIndex
-	local t = {}
-	t.keyword = keyword
-	t.itemslotCount = 0
-	tinsert(subIdxTb, insertIndex, t)
-end
-
-local function InsertToIndexTable(keyword, mailIndex, attachIndex, method)
-	if not keyword or not mailIndex then return end
-	if not revSubIdxTb[keyword] then
-		 UpdateRevIndexTable(keyword, method)
-	end
-	local subIdx = revSubIdxTb[keyword]
+	
 	if method == "no-sorting" then
-		local itemIdxTb = {[1]={mailIndex = mailIndex,attachIndex = attachIndex}}
-		tinsert(subIdxTb[subIdx], itemIdxTb)
+		local itemIdxTb = {[1]={x = x,y = y}}
+		tinsert(subIdxTb[keyword], itemIdxTb)
 		return
 	elseif method == "money" then
 		if keyword then
-			tinsert(subIdxTb[subIdx], mailIndex)
+			tinsert(subIdxTb[keyword], x)
 		end
 		return
 	end
-	if not attachIndex then return end
-	local itemID = GetItemID(G_DB[mailIndex][attachIndex].itemLink)
-	local itemIdxTb = {mailIndex = mailIndex,attachIndex = attachIndex}
-	if getn(subIdxTb[subIdx]) == 0 then --no items in this type yet..
-		subIdxTb[subIdx][1] = {itemID = itemID}--,["count"] = 1}
-		subIdxTb[subIdx][1][1] = itemIdxTb
-		subIdxTb[subIdx].itemslotCount = 1
+	
+	if not y then return end
+	local itemID = GetItemID(G_DB[x][y].itemLink)
+	local itemIdxTb = {x = x, y = y}
+	if not subIdxTb[keyword][itemID] then
+		subIdxTb[keyword][itemID] = {}
+		tinsert(subIdxTb[keyword][itemID], itemIdxTb)
 		return
-	else
-		for i, v in ipairs(subIdxTb[subIdx]) do
-			if subIdxTb[subIdx][i].itemID > itemID then --can insert before end of table
-				local t = {[1] = itemIdxTb, itemID = itemID}
-				tinsert(subIdxTb[subIdx], i, t)
-				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-				return
-			elseif subIdxTb[subIdx][i].itemID == itemID then --same itemID
-				for ii, v in ipairs(subIdxTb[subIdx][i]) do
-					if G_DB[v.mailIndex][v.attachIndex].count >  G_DB[mailIndex][attachIndex].count then --can insert before this count
-						tinsert(subIdxTb[subIdx][i], ii, itemIdxTb)
-						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-						return
-					elseif ii == getn(subIdxTb[subIdx][i]) then --insert to end of this itemID
-						tinsert(subIdxTb[subIdx][i], itemIdxTb)
-						subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-						return
-					end
-				end
-			elseif i == getn(subIdxTb[subIdx]) then  --insert to end of table
-				local t = {[1] = itemIdxTb, itemID = itemID}
-				tinsert(subIdxTb[subIdx], t)
-				subIdxTb[subIdx].itemslotCount = subIdxTb[subIdx].itemslotCount + 1
-				return
-			end
+	end
+	
+	for i, item in ipairs(subIdxTb[keyword][itemID]) do
+		if G_DB[item.x][item.y].count >  G_DB[x][y].count then --can insert before this count
+			tinsert(subIdxTb[keyword][itemID], i, itemIdxTb)
+			return
+		elseif i == getn(subIdxTb[keyword][itemID]) then --insert to end of this itemID
+			tinsert(subIdxTb[keyword][itemID], itemIdxTb)
+			return
 		end
 	end
 end
 
 --[[ subIdxTb structure
-			subType		itemsID			sameID items	slot?
-						(sort by ID)	(sort by count)
-subIdxTb{	[1]		{ 	[1]			{	[1]		=		{ [mailIndex, attachIndex](.itemCount)
-			[2]			[2]				[2]
-			...			...				...
-			[n]			[n]				[n]
-			/.method	.keyword		.itemID
-						.itemslotCount
+			subType			itemsID			sameID items	slot?
+							(sort by ID)	(sort by count)
+subIdxTb{	[keyword1]	{ 	[itemID1]	{	[1]		=		{ [x, y](.itemCount)
+			[keyword2]		[itemID2]		[2]
+			...				...				...
+			[keywordn]		[itemIDn]		[n]
+			/.method	/.keyword		/.itemID
+						/.itemslotCount
 ]]
 --insert and return position (c)!
 --先排序，再看过滤器，最后看堆叠
 --排序已经完成，过滤器就是从排序当中得到子表。
 --堆叠就是把同itemID的当做一个表插入到sortDB
---[[ revSubIdxTb structure
-				subTypeName		subType
-revSubIdxTb{	["a"] 		=	1
-				["b"]		=	2
-				...			
-				["n"]		=	n
-				.__count = count
-]]
 --build filter menu base on subType!
 
 local SelectSortMethod = {
-	["No sorting"] = function(mailIndex, attachIndex)
+	["No sorting"] = function(method, x, y)
 		local keyword = L["No sorting"]
-		InsertToIndexTable(keyword, mailIndex, attachIndex, "no-sorting")	
+		InsertToIndexTable(keyword, x, y, method)	
 	end,
-	["AH"] = function(mailIndex, attachIndex)
-		if not AhSortIndex then BuildSortOrder() end
-		local itemID = GetItemID(G_DB[mailIndex][attachIndex].itemLink)
+	["AH"] = function(method, x, y)
+		--if not AhSortIndex then BuildSortOrder() end
+		local itemID = GetItemID(G_DB[x][y].itemLink)
 		local _, _, itemRarity, _, _, itemType, _, _, _, _, _ = GetItemInfo(itemID)
-		InsertToIndexTable(itemType, mailIndex, attachIndex, "AH")
+		InsertToIndexTable(itemType, x, y, method)
 	end,
-	["quality"] = function(mailIndex, attachIndex)
-		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[mailIndex][attachIndex].itemLink)
-		InsertToIndexTable(quality, mailIndex, attachIndex, "quality")
+	["quality"] = function(method, x, y)
+		local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[x][y].itemLink)
+		InsertToIndexTable(quality, x, y, method)
 	end,
-	["sender"] = function(mailIndex, attachIndex)
-		local sender = G_DB[mailIndex].sender
-		InsertToIndexTable(sender, mailIndex, attachIndex)	
+	["sender"] = function(method, x, y)
+		local sender = G_DB[x].sender
+		InsertToIndexTable(sender, x, y)--?
 	end,--mailbox only
-	["left day"] = function(mailIndex, attachIndex)
-		local leftday = CalcLeftDay(selectChar, mailIndex)
-		InsertToIndexTable(leftday, mailIndex, attachIndex, "left day")
+	["left day"] = function(method, x, y)
+		local leftday = CalcLeftDay(selectChar, x)
+		InsertToIndexTable(leftday, x, y, method)
 	end,--mailbox only
-	["C.O.D."] = function(mailIndex, attachIndex)
+	["C.O.D."] = function(method, x, y)
 		local isCOD
-		if G_DB[mailIndex].CODAmount then
+		if G_DB[x].CODAmount then
 			isCOD = L["is C.O.D."]
 		else
 			isCOD = L["not C.O.D."]
 		end
-		InsertToIndexTable(isCOD, mailIndex, attachIndex)
+		InsertToIndexTable(isCOD, x, y)--?
 	end,--mailbox only
-	["money"] = function(mailIndex)
+	["money"] = function(method, x)
 		local hasMoney
-		if G_DB[mailIndex].money then
+		if G_DB[x].money then
 			hasMoney = L["has money"]
+			InsertToIndexTable(hasMoney, x, nil, method)
 		end
-		InsertToIndexTable(hasMoney, mailIndex, nil, "money")
 	end,--mailbox only
 }
 
@@ -224,28 +134,31 @@ local function Filter_OnClick(self)
 	UIDropDownMenu_SetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown, self.value);
 	ODC_SortFilter:Update("filter")
 end
-
+---finished
 local function FilterMenuInitialize(self, level)
-	--if not revSubIdxTb then return end
+	if not subIdxTb then
+		return
+	end
+	
 	local info = UIDropDownMenu_CreateInfo();
 	info.text = ALL
 	info.value = "__all"
 	info.func = Filter_OnClick;
 	UIDropDownMenu_AddButton(info, level)
 
-	for k, v in ipairs(subIdxTb) do
+	for keyword, t in pairs(subIdxTb) do
 		info = UIDropDownMenu_CreateInfo()
 		local t
 		local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 		if method == "quality" then
-			t = _G["ITEM_QUALITY"..v.keyword.."_DESC"]
+			t = _G["ITEM_QUALITY"..keyword.."_DESC"]
 		elseif method == "left day" then
-			t = format("%d "..DAYS, v.keyword)
+			t = format("%d "..DAYS, keyword)
 		else
-			t = v.keyword
+			t = keyword
 		end
 		info.text = t
-		info.value = v.keyword
+		info.value = keyword
 		info.func = Filter_OnClick;
 		UIDropDownMenu_AddButton(info, level)
 	end
@@ -269,7 +182,8 @@ end
 local function SortMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
 	for k, v in pairs(SelectSortMethod) do
-		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money") or (k == "No sorting" or k == "AH" or k == "quality") then
+		if selectTab == "mail" and (k == "sender" or k == "left day" or k == "C.O.D." or k == "money")
+		or (k == "No sorting" or k == "AH" or k == "quality") then
 			info = UIDropDownMenu_CreateInfo()
 			info.text = L[k]
 			info.value = k
@@ -299,6 +213,27 @@ StaticPopupDialogs["MAILBOXBANK_ACCEPT_COD_MAIL"] = {
     hideOnEscape = 1
 };
 
+local function MailSlotClick(slot)
+	if ODC_DB[selectChar]["mail"][slot.x[1]].CODAmount then
+		if ODC_DB[selectChar]["mail"][slot.x[1]].CODAmount > GetMoney() then
+			SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
+			StaticPopup_Show("COD_ALERT");
+		else
+			codMoney = ODC_DB[selectChar]["mail"][slot.x[1]].CODAmount
+			codMailIndex, codAttachmentIndex = slot.x[1], slot.y[1]
+			SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
+			StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
+		end
+	else
+		if slot.x[1] and slot.y[1] then
+			--for i = getn(slot.x), 1, -1 do
+				TakeInboxItem(slot.x[1], slot.y[1])
+			--end
+			ODC_SortFilter:Update("sort")
+		end
+	end
+end
+
 local function SlotClick(slot,button)
 	local msg = slot.link
 	if not msg then return; end
@@ -318,23 +253,7 @@ local function SlotClick(slot,button)
 		end
 	elseif button == 'LeftButton' and not isStacked then
 		if selectTab == "mail" then
-			if ODC_DB[selectChar]["mail"][slot.mailIndex[1]].CODAmount then
-				if ODC_DB[selectChar]["mail"][slot.mailIndex[1]].CODAmount > GetMoney() then
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "red");
-					StaticPopup_Show("COD_ALERT");
-				else
-					codMoney, codMailIndex, codAttachmentIndex = ODC_DB[selectChar]["mail"][slot.mailIndex[1]].CODAmount, slot.mailIndex[1], slot.attachIndex[1]
-					SetMoneyFrameColor("GameTooltipMoneyFrame1", "white");
-					StaticPopup_Show("MAILBOXBANK_ACCEPT_COD_MAIL")
-				end
-			else
-				if slot.mailIndex[1] and slot.attachIndex[1] then
-					--for i = getn(slot.mailIndex), 1, -1 do
-						TakeInboxItem(slot.mailIndex[1], slot.attachIndex[1])
-					--end
-					ODC_SortFilter:Update("sort")
-				end
-			end
+			MailSlotClick(slot)
 		else
 			
 		end
@@ -355,29 +274,31 @@ local function GetLeftTimeText(mailIndex)
 	return lefttext, leftday
 end
 
-local function TooltipShow(slot)
-	if selectTab ~= "mail" then 
-		if slot and slot.link then
-			local x = slot:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(slot, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(slot, "ANCHOR_RIGHT");
-			end
-			GameTooltip:SetHyperlink(slot.link)
-		end
-		return
+local function SetTooltipAnchor(slot)
+	local x = slot:GetRight();
+	if ( x >= ( GetScreenWidth() / 2 ) ) then
+		GameTooltip:SetOwner(slot, "ANCHOR_LEFT");
+	else
+		GameTooltip:SetOwner(slot, "ANCHOR_RIGHT");
 	end
-	local mIdx, aIdx = slot.mailIndex, slot.attachIndex
+end
+--[[
+Tool-tip format
+Left				Right
+sender1				count
++lefttime1			count
+ -was returned
++lefttime2			count
+(is cod)			amount
+sender2				count
++lefttime1			count
+]]
+local function MailTooltipShow(slot)
+	local mIdx, aIdx = slot.x, slot.y
 	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 	--local sender, wasReturned
 	if method =="money" then
-			local x = slot:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(slot, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(slot, "ANCHOR_RIGHT");
-			end
+		SetTooltipAnchor(slot)
 		local money = ODC_DB[selectChar]["mail"][mIdx].money
 		local lefttext = L["Sender: "] ..ODC_DB[selectChar]["mail"][mIdx].sender
 		local rL, gL, bL = 1, 1, 1
@@ -388,12 +309,7 @@ local function TooltipShow(slot)
 		return
 	else
 		if slot and slot.link then
-			local x = slot:GetRight();
-			if ( x >= ( GetScreenWidth() / 2 ) ) then
-				GameTooltip:SetOwner(slot, "ANCHOR_LEFT");
-			else
-				GameTooltip:SetOwner(slot, "ANCHOR_RIGHT");
-			end
+			SetTooltipAnchor(slot)
 			GameTooltip:SetHyperlink(slot.link)
 		end
 	end
@@ -443,7 +359,6 @@ local function TooltipShow(slot)
 				tinsert(formatList[ODC_DB[selectChar]["mail"][mIdx[i]].sender], row)
 			end
 		end
-		
 	end
 	
 	for k in pairs(formatList) do
@@ -471,42 +386,66 @@ local function TooltipShow(slot)
 	GameTooltip:Show()
 end
 
+local function TooltipShow(slot)
+	if selectTab ~= "mail" then 
+		if slot and slot.link then
+			SetTooltipAnchor(slot)
+			GameTooltip:SetHyperlink(slot.link)
+		end
+	else
+		MailTooltipShow(slot)
+	end
+end
+
 local function SummingForQuality(slotdb)
-	local mailIndex, attachIndex = slotdb.mailIndex, slotdb.attachIndex
-	if not mailIndex or not attachIndex or not selectChar then return end
-	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[mailIndex][attachIndex].itemLink)
+	local x, y = slotdb.x, slotdb.y
+	if not x or not y or not selectChar then return end
+	local _, _, quality, _, _, _, _, _, _, _ = GetItemInfo(G_DB[x][y].itemLink)
 	if not quality then return end
 	if not sumQuality[quality] then sumQuality[quality] = 0 end
-	local count = G_DB[mailIndex][attachIndex].count
+	local count = G_DB[x][y].count
 	sumQuality[quality] = sumQuality[quality] + count
 end
 --[[
 structure of slotDB:
 case1: isStack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
+slotDB{		[1]		{	[1].x .y
+			[2]			[2].x .y
 case2: not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]		{	[1].mailIndex .attachIndex
+slotDB{		[1]		{	[1].x .y
+			[2]		{	[1].x .y
 case3: money only
-slotDB{		[1]		.mailIndex
+slotDB{		[1]		.x
 			[2]		
 ]]
+local function SortKeys(t)
+	local sort_table = {}
+	--取出所有的键
+	for k, _ in pairs(t) do
+		table.insert(sort_table, k)
+	end
+	--对所有键进行排序
+	table.sort(sort_table)
+	return sort_table
+end
 
-local function SubFilter(i, c)
-	for j = 1, getn(subIdxTb[i]) do
-		if not isStacked then --ODC_Config.UI.isStacked
-			for k = 1, getn(subIdxTb[i][j]) do
+local function SubFilter(k, c)
+	if not slotDB then slotDB = {} end
+	if not subIdxTb[k] then return end
+	local sort_itemID = SortKeys(subIdxTb[k])
+	for _, itemID in ipairs(sort_itemID) do
+		if not isStacked then
+			for i = 1, getn(subIdxTb[k][itemID]) do
 				c = c + 1
 				slotDB[c] = {}
-				slotDB[c][1] = subIdxTb[i][j][k]--??
+				slotDB[c][1] = subIdxTb[k][itemID][i]--??
 				SummingForQuality(slotDB[c][1])
 			end
 		else
 			c = c + 1
-			slotDB[c] = subIdxTb[i][j]
-			for k = 1, getn(subIdxTb[i][j]) do
-				SummingForQuality(subIdxTb[i][j][k])
+			slotDB[c] = subIdxTb[k][itemID]
+			for i = 1, getn(subIdxTb[k][itemID]) do
+				SummingForQuality(subIdxTb[k][itemID][i])
 			end
 		end
 	end
@@ -515,71 +454,63 @@ end
 
 local function Filter()
 	if not subIdxTb then return end
-	slotDB = {}
+	slotDB = nil
 	sumQuality = {}
 	local filter = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameFilterDropDown)
 	if not filter then filter = "__all" end
-	local c = 0
-	
-	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
-	if method == "money" then
-		for i = 1, getn(subIdxTb[1]) do
-			c = c + 1
-			slotDB[c] = subIdxTb[1][i]
-		end
-		return
-	end
+	local count = 0
 	if filter == "__all" then
-		for i = 1, getn(subIdxTb) do
-			c = SubFilter(i, c)
+		local sort_subIdxTb = SortKeys(subIdxTb)
+		for _, k in ipairs(sort_subIdxTb) do
+			count = SubFilter(k, count)
 		end
 	else
-		i = revSubIdxTb[filter]
-		c = SubFilter(i, c)
+		count = SubFilter(filter, count)
 	end
 end
 
 local function SortDB()
 	local method = UIDropDownMenu_GetSelectedValue(ODCFrameSortFilterSubFrameSortDropDown)
 	if not method then return end
-	subIdxTb = {}
-	--subIdxTb.method = method
-	revSubIdxTb = {__count = 0}
+	subIdxTb = nil
+	slotDB = nil
 	if not G_DB then return end --by eui.cc
 
-	for firstIndex ,t1 in pairs(G_DB) do
+	for x, t1 in pairs(G_DB) do
 		if type(t1) == "table" then
-			--if not G_DB[firstIndex] then return end
+			--if not G_DB[x] then return end
 			if method == "money" then
-				if G_DB[firstIndex].money then
-					SelectSortMethod[method](firstIndex)
+				if G_DB[x].money then
+					SelectSortMethod[method](method, x)
 				end
 			else
-				for secondIndex, t in pairs(G_DB[firstIndex]) do
+				for y, t in pairs(G_DB[x]) do
 					if type(t) == "table" then
-						SelectSortMethod[method](firstIndex, secondIndex)
+						SelectSortMethod[method](method, x, y)
 					end
 				end
 			end
 		end
 	end
-	
-	if revSubIdxTb.__count == 0 then slotDB = nil; return end
+	selectSortChanged = true
 	UIDropDownMenu_Initialize(ODCFrameSortFilterSubFrameFilterDropDown, FilterMenuInitialize)
+	if not subIdxTb then return end
 	Filter()
 end
 
 local function UpdateContainer()
 	if not ODC.Frame or not ODC_SortFilter.Frame then return end
 	ODC_SortFilter.Frame.mailboxGoldText:SetText("")
-	
 	for i = 1, Config.itemsSlotDisplay do
 		if ODC_SortFilter.Frame.Container[i] then
 			ODC_SortFilter.Frame.Container[i]:Hide()
 		end
 	end
-	if not slotDB then return end
-	
+	if not slotDB or getn(slotDB) == 0 then
+		ODC_SortFilter.Frame.scrollBar:Hide()
+		return
+	end
+
 	local sumQ = ""
 	for i = 1, 7 do
 		if sumQuality[i] then
@@ -600,6 +531,7 @@ local function UpdateContainer()
 		end
 		former = former .. GetCoinTextureString(G_DB.money)
 	end
+	
 	ODC_SortFilter.Frame.mailboxGoldText:SetText(former..sumQ)
 	--ODC.mailboxTime:SetText(floor(difftime(time(),sorted_db[selectChar].checkMailTick)/60).." 分鐘前掃描" or "");
 
@@ -612,22 +544,6 @@ local function UpdateContainer()
 		iconDisplayCount = getn(slotDB) - offset * 8
 	end
 	
---[[
-structure of slotDB:
-case1&2: isStack = not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
-case3: money only
-slotDB{		[1]		.mailIndex
-			[2]
-
-				mailIndex	attachIndex
-[charName] = {	[1]			[1]			{	.count
-				[n]			.sender			.itemLink
-				.daysLeft 	.wasReturned?
-				.mailCount	.CODAmount?
-				.itemCount
-]]
 	for i = 1, iconDisplayCount do
 		local itemIndex = i + offset * 8
 		local slot = ODC_SortFilter.Frame.Container[i]
@@ -639,25 +555,23 @@ slotDB{		[1]		.mailIndex
 		slot.tex:SetVertexColor(1, 1, 1)
 		slot.count:SetTextColor(1, 1, 1)
 		slot.cod:Hide()
-		slot.mailIndex, slot.attachIndex = nil, nil
+		slot.x, slot.y = nil, nil
 		----ending
 		if method == "money" then
 			local mailIndex = slotDB[itemIndex]
-			slot.mailIndex = mailIndex
+			slot.x = mailIndex
 
 			local money = G_DB[mailIndex].money
 			slot.tex:SetTexture(GetCoinIcon(money))
 			slot.count:SetText(money/10000)
 		else
-			slot.mailIndex = {}
-			slot.attachIndex = {}
+			slot.x = {}
+			slot.y = {}
 			for j = 1, getn(slotDB[itemIndex]) do
-				tinsert(slot.mailIndex, slotDB[itemIndex][j].mailIndex)
-				tinsert(slot.attachIndex, slotDB[itemIndex][j].attachIndex)
+				tinsert(slot.x, slotDB[itemIndex][j].x)
+				tinsert(slot.y, slotDB[itemIndex][j].y)
 			end
-			--local mailIndex, attachIndex = slotDB[itemIndex].mailIndex, slotDB[itemIndex].attachIndex--!!!!
-			--slot.data = slotDB[itemIndex]
-			slot.link = G_DB[slot.mailIndex[1]][slot.attachIndex[1]].itemLink
+			slot.link = G_DB[slot.x[1]][slot.y[1]].itemLink
 			if slot.link then
 				slot.name, _, slot.rarity, _, _, _, _, _, _, slot.texture = GetItemInfo(slot.link);
 				if slot.rarity and slot.rarity > 1 then
@@ -671,16 +585,18 @@ slotDB{		[1]		.mailIndex
 				slot:SetBackdropBorderColor(0.3, 0.3, 0.3)
 			end
 			
+			----For slot item count
 			local countnum = 0
-			for j = 1 , getn(slot.mailIndex) do
-				countnum = countnum + G_DB[slot.mailIndex[j]][slot.attachIndex[j]].count
-				if G_DB[slot.mailIndex[j]].CODAmount then
-				slot.tex:SetDesaturated(1)
-				slot.cod:Show()
+			for j = 1 , getn(slot.x) do
+				countnum = countnum + G_DB[slot.x[j]][slot.y[j]].count
+				if G_DB[slot.x[j]].CODAmount then
+					slot.tex:SetDesaturated(1)
+					slot.cod:Show()
 				end
 			end
 			slot.count:SetText(countnum > 1 and countnum or '');
 			
+			----For searching
 			if ODC_SortFilter.Frame.searchingBar:HasFocus() then
 				if not slot.name then break end
 				local searchingStr = ODC_SortFilter.Frame.searchingBar:GetText();
@@ -690,46 +606,12 @@ slotDB{		[1]		.mailIndex
 					slot.count:SetTextColor(0.3, 0.3, 0.3)
 				end
 			end
-			
 		end
 		
 		slot:Show()
 	end
 	FauxScrollFrame_Update(ODC_SortFilter.Frame.scrollBar, ceil(getn(slotDB) / Config.numItemsPerRow) , Config.numItemsRows, Config.buttonSize + Config.buttonSpacing );
 end
-
---[[
-Tool-tip format
-Left				Right
-sender1				count
-+lefttime1			count
- -was returned
-+lefttime2			count
-(is cod)			amount
-sender2				count
-+lefttime1			count
-]]
---[[
-structure of slotDB:
-case1: isStack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]			[2].mailIndex .attachIndex
-case2: not stack
-slotDB{		[1]		{	[1].mailIndex .attachIndex
-			[2]		{	[1].mailIndex .attachIndex
-case3: money only
-slotDB{		[1]		.mailIndex
-			[2]
-
-				mailIndex	attachIndex
-[charName] = {	[1]			[1]			{	.count!
-				[n]			.sender!		.itemLink
-				.mailCount	.wasReturned!
-				.itemCount	.CODAmount!
-							.money?
-							.daysLeft!
-]]
-
 
 function ODC_SortFilter:GameTooltip_OnTooltipCleared(TT)
 	if ( not TT ) then
@@ -913,8 +795,8 @@ local function CreateSubFrame()
 	
 	----Create scroll frame
 	f.scrollBar = CreateFrame("ScrollFrame", FRAMENAME.."ScrollBar", f, "FauxScrollFrameTemplate")
-	f.scrollBar:SetPoint("TOPLEFT", 0, -64)
-	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 40)
+	f.scrollBar:SetPoint("TOPLEFT", 0, -50)
+	f.scrollBar:SetPoint("BOTTOMRIGHT", -28, 45)
 	f.scrollBar:SetHeight( Config.numItemsRows * Config.buttonSize + (Config.numItemsRows - 1) * Config.buttonSpacing)
 	f.scrollBar:Hide()
 	--f.scrollBar:EnableMouseWheel(true)
@@ -1051,9 +933,11 @@ function ODC_SortFilter:Update(method)
 	if not selectChar then return end
 	--selectTab = tabName
 	G_DB = ODC_DB[selectChar][selectTab]
+
 	if not G_DB then return end
 
 	if method == "sort" then
+		--UIDropDownMenu_Initialize(ODCFrameSortFilterSubFrameFilterDropDown, FilterMenuInitialize)
 		SearchBarResetAndClear()
 		SortDB()
 	elseif method == "filter" then

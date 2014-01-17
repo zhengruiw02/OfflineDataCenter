@@ -56,8 +56,8 @@ end
 
 local function ChooseCharMenuInitialize(self, level)
 	local info = UIDropDownMenu_CreateInfo();
-	for k, v in pairs(ODC_Config.player) do
-		if type(k) == 'string' then
+	for k, v in pairs(ODC_DB) do
+		if type(k) == 'string' and type(v) == 'table' then
 			local info = UIDropDownMenu_CreateInfo()
 			info.text = k
 			info.value = k
@@ -278,26 +278,7 @@ function ODC:CreatePopupFrame()
 	f.cancle:SetText(CANCEL)
 end
 
-function ODC:FrameShow()
-	self.Frame:Show()
-end
 
-function ODC:FrameHide()
-	self.Frame:Hide()
-	ODC_Config.UI.activePage = self.selectTab
-	if not InCombatLockdown() then
-		collectgarbage("collect")
-	end
-end
-
-function ODC:ToggleWindow()
-	if self.Frame:IsVisible() then
-		self:FrameHide()
-	else
-		--self:Update("sort")
-		self:FrameShow()
-	end
-end
 
 local OfflineDataCenterPopMenu = {}
 
@@ -509,6 +490,27 @@ local function PrintCmdHelper()
 	"/ODC state: to show tabs state\n")
 end
 
+function ODC:FrameShow()
+	self.Frame:Show()
+end
+
+function ODC:FrameHide()
+	self.Frame:Hide()
+	ODC_Config.UI.activePage = self.selectTab
+	if not InCombatLockdown() then
+		collectgarbage("collect")
+	end
+end
+
+function ODC:ToggleWindow()
+	if self.Frame:IsVisible() then
+		self:FrameHide()
+	else
+		--self:Update("sort")
+		self:FrameShow()
+	end
+end
+
 local function PrintTabState()
 	for k, v in pairs(ODC_Config.toggle) do
 		if v then
@@ -563,13 +565,101 @@ function ODC:OpenBags()
 	CreateToggleButton(ElvUI_ContainerFrame)
 	CreateToggleButton(ContainerFrame1)
 end
-		
+
+local function CopyTable(ori_tab)
+    if (type(ori_tab) ~= "table") then
+        return nil;
+    end
+    local new_tab = {};
+    for i,v in pairs(ori_tab) do
+        local vtyp = type(v);
+        if (vtyp == "table") then
+            new_tab[i] = CopyTable(v);
+        else
+            new_tab[i] = v;
+        end
+    end
+    return new_tab;
+end
+--[[
+MB_DB structure:
+				mailIndex		attachIndex
+[charName] = {	[1]				[1]			{	.count
+				[n]				.sender			.itemLink
+				/.mailCount		.daysLeft
+				/.itemCount		.wasReturned
+				.checkMailTick	.CODAmount?
+								.money?
+
+BB_DB structure:
+				bagID		slotID
+[charName] = {	[1]			[1]			{	.count
+				[n]			/.slotMAX		.itemLink
+
+IN_DB structure:
+							INVSLOT
+[charName] = {	[1]		{	[1]			{	.count
+							[2]				.itemLink
+]]
+local function ConvertOldDB()
+	if type(MB_DB) == "table" then
+		for playerName, t in pairs(MB_DB) do
+			if type(t) == "table" then
+				if not ODC_DB[playerName] then ODC_DB[playerName] = {} end
+				ODC_DB[playerName]["mail"] = {}
+				ODC_DB[playerName]["mail"] = CopyTable(t)
+				ODC_DB[playerName]["mail"].mailCount = nil
+				ODC_DB[playerName]["mail"].itemCount = nil
+			end
+		end
+		MB_DB = nil
+	end
+	if type(BB_DB) == "table" then
+		for playerName, t in pairs(BB_DB) do
+			if type(t) == "table" then
+				if not ODC_DB[playerName] then ODC_DB[playerName] = {} end
+				ODC_DB[playerName]["bag"] = {}
+				ODC_DB[playerName]["bank"] = {}
+				local BagIDs = {0, 1, 2, 3, 4}
+				local BankIDs = {-1, 5, 6, 7, 8, 9, 10, 11}
+				for _, i in pairs(BagIDs) do
+					if t[i] and type(t[i]) == "table" then
+						ODC_DB[playerName]["bag"][i] = CopyTable(t[i])
+						ODC_DB[playerName]["bag"][i].slotMAX = nil
+					end
+				end
+				for _, i in pairs(BankIDs) do
+					if t[i] and type(t[i]) == "table" then
+						ODC_DB[playerName]["bank"][i] = CopyTable(t[i])
+						ODC_DB[playerName]["bank"][i].slotMAX = nil
+					end
+				end
+			end
+		end
+		BB_DB = nil
+	end
+	if type(IN_DB) == "table" then
+		for playerName, t in pairs(IN_DB) do
+			if type(t) == "table" then
+				if not ODC_DB[playerName] then ODC_DB[playerName] = {} end
+				ODC_DB[playerName]["inventory"] = {}
+				ODC_DB[playerName]["inventory"] = CopyTable(t)
+			end
+		end
+		IN_DB = nil
+	end
+	if type(MB_Config) == "table" then
+		ODC_Config.UI = CopyTable(MB_Config)
+		MB_Config = nil
+	end
+end
+
 function ODC:OnInitialize()
-	if ODC_Config == nil then ODC_Config = {UI = {},toggle = {},player = {}} end
+	if ODC_Config == nil then ODC_Config = {UI = {},toggle = {}} end--,player = {}
 	if ODC_DB == nil then ODC_DB = {} end
 	if ODC_DB[ODC.playername] == nil then ODC_DB[ODC.playername] = {} end
-	
-	ODC_Config.player[ODC.playername] = true
+	ConvertOldDB()
+	--ODC_Config.player[ODC.playername] = true
 	self.selectTab = ODC_Config.UI.activePage or nil
 
 	CreateODCFrame()
