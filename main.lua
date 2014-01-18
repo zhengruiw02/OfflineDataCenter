@@ -193,14 +193,14 @@ end
 local function CreateFrameTab(f)
 	--tab button
 	local tabIndex = 1
-	for k , v in pairs(ODC.Tabs) do
-		texture = v.Textures
+	for k , v in pairs(ODC_Config.toggle) do
 		if not ODC_Config.toggle[k] then
 			if _G[f:GetName()..k..'Tab'] then
 				_G[f:GetName()..k..'Tab']:Hide()
 				_G[f:GetName()..k..'Tab'] = nil
 			end
 		else
+			texture = ODC.Tabs[k].Textures
 			local tab = _G[f:GetName()..k..'Tab'] or CreateFrame("CheckButton", f:GetName()..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
 			tab:ClearAllPoints()
 			if ElvUI then
@@ -428,20 +428,18 @@ local function CreateToggleButton(f)
 	end
 
 	if ElvUI then --and not f.offlineButton
+		if f.offlineButton then
+			for k, v in pairs(f.offlineButton) do
+				v:Hide()
+				v = nil
+			end
+		end
 		f.offlineButton = {}
 		--offline button
-		if ODC_Config.toggle.bag then
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bag', f))
+		for tabName, v in pairs(ODC.Tabs) do
+			tinsert(f.offlineButton, CreateElvUIBagToggleButton(tabName, f))
 		end
-		if ODC_Config.toggle.bank then
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton('bank', f))
-		end
-		if ODC_Config.toggle.mail then
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton('mail', f))
-		end
-		if ODC_Config.toggle.inventory then
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton('inventory', f))
-		end
+
 		if #f.offlineButton > 0 then
 			for i = 1, #f.offlineButton do
 				if i == 1 then
@@ -643,7 +641,16 @@ local function ConvertOldDB()
 			if type(t) == "table" then
 				if not ODC_DB[playerName] then ODC_DB[playerName] = {} end
 				ODC_DB[playerName]["inventory"] = {}
-				ODC_DB[playerName]["inventory"] = CopyTable(t)
+				if t[1] and type(t[1]) == "table" then
+					ODC_DB[playerName]["inventory"][1] = {}
+					for i, v in pairs(t[1]) do
+						if v.itemLink then
+							ODC_DB[playerName]["inventory"][1][i] = CopyTable(v)
+						else
+							ODC_DB[playerName]["inventory"][1][i] = nil
+						end
+					end
+				end
 			end
 		end
 		IN_DB = nil
@@ -655,11 +662,10 @@ local function ConvertOldDB()
 end
 
 function ODC:OnInitialize()
-	if ODC_Config == nil then ODC_Config = {UI = {},toggle = {}} end--,player = {}
+	if ODC_Config == nil then ODC_Config = {UI = {},toggle = {}} end
 	if ODC_DB == nil then ODC_DB = {} end
 	if ODC_DB[ODC.playername] == nil then ODC_DB[ODC.playername] = {} end
 	ConvertOldDB()
-	--ODC_Config.player[ODC.playername] = true
 	self.selectTab = ODC_Config.UI.activePage or nil
 
 	CreateODCFrame()
