@@ -1,6 +1,6 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("OfflineDataCenter", "zhTW")
 if L then
-	L["Offline Data Center"] = "郵箱銀行"
+	L["Offline Data Center"] = "離線數據中心"
 	L["UNKNOWN SENDER"] = "\[未知發件人\]"
 	L["Stack items"] = "堆疊物品"
 	L["No sorting"] = "不排序"
@@ -42,4 +42,13 @@ if L then
 	L['Show the number of items for all Character'] = '顯示所有角色的物品數量';
 	
 	L["Offline Data Center toggle button can not be created in Combating, please leave the combat before retry!"] = '戰鬥時, 離線背包按鈕不能被創建, 請離開戰鬥後重試';
+	
+	L[" is |cff33ff33enabled|r"] = " 已|cff33ff33"..ENABLE.."|r";
+	L[" is |cffff3333disabled|r"] = " 已|cffff3333"..DISABLE.."|r";
+	L["Tab name does not exist!"] = "標籤名字不存在!";
+	L["COMMANDHELPER"] = "|cffffff33未知ODC命令! ODC命令小精靈:|r\n"..
+	"|cff33ff33/ODC toggle|r: 開啟/關閉ODC視窗\n"..
+	"|cff33ff33/ODC enable [標籤名]|r: 啟用|cffffff33[標籤名]|r\n"..
+	"|cff33ff33/ODC disable [標籤名]|r: 禁用|cffffff33[標籤名]|r\n"..
+	"|cff33ff33/ODC state|r: 顯示標籤狀態\n";
 end

@@ -50,8 +50,12 @@ local function ChooseChar_OnClick(self)
 	
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
+	if width > 140 then
+		OfflineDataCenterFrameChooseCharDropDownText:SetWidth(140)
+		width = 140
+	end
 	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+60)	
+	ODC.Frame.chooseChar:SetWidth(width+80)	
 end
 
 local function ChooseCharMenuInitialize(self, level)
@@ -71,7 +75,7 @@ local function ChooseCharMenuInitialize(self, level)
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
 	local width = text:GetStringWidth();
 	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+60)
+	ODC.Frame.chooseChar:SetWidth(width+80)
 end
 
 function ODC:ShowSubFrame(tabName, subFrame)
@@ -514,7 +518,9 @@ function ODC:RemoveTab(tabName)
 end
 
 function ODC:AddAvaliableTab(tabName, module)
-	self.TabsAvaliable[tabName] = module
+	self.TabsAvaliable[tabName] = {}
+	self.TabsAvaliable[tabName].module = module
+	self.TabsAvaliable[tabName].locale = module.tabs[tabName].Tooltip
 end
 
 function ODC:FrameShow()
@@ -540,19 +546,15 @@ function ODC:ToggleWindow()
 end
 
 local function PrintCmdHelper()
-	print("|cffffff33Unknow ODC command! ODC command helper:|r\n"..
-	"|cff33ff33/ODC toggle|r: to toggle ODC window\n"..
-	"|cff33ff33/ODC enable [tab name]|r: to enable |cffffff33[tab name]|r\n"..
-	"|cff33ff33/ODC disable [tab name]|r: to disable |cffffff33[tab name]|r\n"..
-	"|cff33ff33/ODC state|r: to show tabs state\n")
+	print(L["COMMANDHELPER"])
 end
 
 local function PrintTabState()
-	for k, v in pairs(ODC_Config.toggle) do
+	for tabName, v in pairs(ODC_Config.toggle) do
 		if v then
-			print(k.." is |cff33ff33enabled|r")
+			print((ODC.TabsAvaliable[tabName].locale or tabName)..L[" is |cff33ff33enabled|r"])
 		else
-			print(k.." is |cffff3333disabled|r")
+			print((ODC.TabsAvaliable[tabName].locale or tabName)..L[" is |cffff3333disabled|r"])
 		end
 	end
 end
@@ -561,11 +563,11 @@ function ODC:EnableTab(tabName)
 	if not tabName then
 		PrintCmdHelper()
 	elseif ODC_Config.toggle[tabName] == nil then
-		print("Tab name does not exist!")
+		print(L["Tab name does not exist!"])
 		PrintTabState()
 	else
 		ODC_Config.toggle[tabName] = true
-		self.TabsAvaliable[tabName]:OnEnable()
+		self.TabsAvaliable[tabName].module:OnEnable()
 	end
 end
 
@@ -577,7 +579,7 @@ function ODC:DisableTab(tabName)
 		PrintTabState()
 	else
 		ODC_Config.toggle[tabName] = false
-		self.TabsAvaliable[tabName]:OnDisable()
+		self.TabsAvaliable[tabName].module:OnDisable()
 	end
 end
 
