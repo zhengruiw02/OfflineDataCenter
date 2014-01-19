@@ -48,14 +48,7 @@ local function ChooseChar_OnClick(self)
 	if not ODC.selectTab then return end
 	ODC.Tabs[ODC.selectTab].CharChangedFunc()
 	
-	local text = OfflineDataCenterFrameChooseCharDropDownText;
-	local width = text:GetStringWidth();
-	if width > 140 then
-		OfflineDataCenterFrameChooseCharDropDownText:SetWidth(140)
-		width = 140
-	end
-	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+80)	
+	OfflineDataCenterFrameChooseCharDropDownText:SetWidth(140)
 end
 
 local function ChooseCharMenuInitialize(self, level)
@@ -72,10 +65,7 @@ local function ChooseCharMenuInitialize(self, level)
 		end
 	end
 	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, ODC.selectChar);
-	local text = OfflineDataCenterFrameChooseCharDropDownText;
-	local width = text:GetStringWidth();
-	UIDropDownMenu_SetWidth(ODC.Frame.chooseChar, width+40);
-	ODC.Frame.chooseChar:SetWidth(width+80)
+	OfflineDataCenterFrameChooseCharDropDownText:SetWidth(140)
 end
 
 function ODC:ShowSubFrame(tabName, subFrame)
@@ -172,7 +162,7 @@ local function CreateODCFrame()
 	f.chooseChar:SetPoint("LEFT", f.title, f.title:GetStringWidth(), -5)
 	UIDropDownMenu_Initialize(f.chooseChar, ChooseCharMenuInitialize)
 	--UIDropDownMenu_SetWidth(OfflineDataCenterFrameChooseCharDropDown, 200);
-	
+
 	----Create close button
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
 	f.closeButton:SetPoint("TOPRIGHT", -2, -2);
@@ -192,7 +182,7 @@ local function CreateODCFrame()
 		local S = ElvUI[1]:GetModule("Skins")
 		if S then
 			S:HandleCloseButton(f.closeButton);
-			S:HandleDropDownBox(f.chooseChar)
+			S:HandleDropDownBox(f.chooseChar, 200)
 		end
 	end
 end

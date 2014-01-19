@@ -812,6 +812,7 @@ local function CreateSubFrame()
 		local S = ElvUI[1]:GetModule("Skins")
 		if S then
 			S:HandleCheckBox(f.stackUpCheckButton);
+			f.stackUpCheckButton:Size(20)
 			S:HandleDropDownBox(f.sortmethod)
 			S:HandleDropDownBox(f.filter)
 			S:HandleScrollBar(_G[FRAMENAME.."ScrollBarScrollBar"])
