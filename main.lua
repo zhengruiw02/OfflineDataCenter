@@ -45,7 +45,7 @@ local function ChooseChar_OnClick(self)
 	SetSelectedChar()
 
 	UIDropDownMenu_SetSelectedValue(ODC.Frame.chooseChar, self.value);
-
+	if not ODC.selectTab then return end
 	ODC.Tabs[ODC.selectTab].CharChangedFunc()
 	
 	local text = OfflineDataCenterFrameChooseCharDropDownText;
@@ -74,7 +74,7 @@ local function ChooseCharMenuInitialize(self, level)
 	ODC.Frame.chooseChar:SetWidth(width+60)
 end
 
-function ODC:ShowSubFrame (tabName, subFrame)
+function ODC:ShowSubFrame(tabName, subFrame)
 	local thisFrame = self.Tabs[tabName].subFrame
 
 	if not thisFrame then
@@ -99,6 +99,7 @@ end
 function ODC:SetActiveTab(tabName, showFrame)
 	self.selectTab = tabName
 	ODC_Config.UI.activePage = tabName
+	if not tabName then return end
 	SetSelectedTab()
 	if not ODC_Config.toggle[tabName] then
 		print(ODC.Tabs[tabName].Tooltip..'is not Enabled')
@@ -172,7 +173,9 @@ local function CreateODCFrame()
 	f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton");
 	f.closeButton:SetPoint("TOPRIGHT", -2, -2);
 	f.closeButton:HookScript("OnClick", function()
-		collectgarbage("collect")
+		if not InCombatLockdown() then
+			collectgarbage("collect")
+		end
 	end)
 	
 	----Create container for subFrame
@@ -190,49 +193,66 @@ local function CreateODCFrame()
 	end
 end
 
+local function CreateTab(f, tabName)
+	local texture = ODC.Tabs[tabName].Textures
+	local tab = CreateFrame("CheckButton", f:GetName()..tabName..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
+	tab:ClearAllPoints()
+	if ElvUI then
+		tab:DisableDrawLayer("BACKGROUND")
+		tab:SetNormalTexture(texture)
+		tab:GetNormalTexture():ClearAllPoints()
+		tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
+		tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
+		tab:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+		tab:CreateBackdrop("Default")
+		tab.backdrop:SetAllPoints()
+		tab:StyleButton()
+	else
+		tab:SetNormalTexture(texture)
+	end	
+	tab:SetAttribute("type", "spell")
+	tab:SetAttribute("spell", f:GetName())
+	tab.tabName = tabName
+	tab:SetScript("OnClick", function(self)
+		ODC:SetActiveTab(self.tabName)
+	end)
+	tab.tooltip = ODC.Tabs[tabName].Tooltip
+	return tab
+end
+
 local function CreateFrameTab(f)
 	--tab button
-	local tabIndex = 1
-	for k , v in pairs(ODC_Config.toggle) do
-		if not ODC_Config.toggle[k] then
-			if _G[f:GetName()..k..'Tab'] then
-				_G[f:GetName()..k..'Tab']:Hide()
-				_G[f:GetName()..k..'Tab'] = nil
-			end
-		else
-			texture = ODC.Tabs[k].Textures
-			local tab = _G[f:GetName()..k..'Tab'] or CreateFrame("CheckButton", f:GetName()..k..'Tab', f, "SpellBookSkillLineTabTemplate SecureActionButtonTemplate")
+	if f.tabButton then
+		for tabName, tab in pairs(f.tabButton) do
+			tab:Hide()
 			tab:ClearAllPoints()
+			tab.enable = false
+		end
+	else
+		f.tabButton = {}
+	end
+	
+	for tabName, v in pairs(ODC.Tabs) do
+		if not f.tabButton[tabName] then
+			f.tabButton[tabName] = CreateTab(f, tabName)
+		end
+		f.tabButton[tabName].enable = true
+	end
+	
+	local tabIndex = 1
+	for tabName, tab in pairs(f.tabButton) do
+		if tab.enable then
 			if ElvUI then
-				--local S = ElvUI[1]:GetModule("Skins")
 				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, (-44 * tabIndex) + 34)
-				tab:DisableDrawLayer("BACKGROUND")
-				tab:SetNormalTexture(texture)
-				tab:GetNormalTexture():ClearAllPoints()
-				tab:GetNormalTexture():Point("TOPLEFT", 2, -2)
-				tab:GetNormalTexture():Point("BOTTOMRIGHT", -2, 2)
-				tab:GetNormalTexture():SetTexCoord(0.1, 0.9, 0.1, 0.9)
-
-				tab:CreateBackdrop("Default")
-				tab.backdrop:SetAllPoints()
-				tab:StyleButton()
 			else
 				tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, (-48 * tabIndex) + 18)
-				tab:SetNormalTexture(texture)
 			end	
-			tabIndex = tabIndex + 1
-			tab:SetAttribute("type", "spell")
-			tab:SetAttribute("spell", f:GetName())
-			tab.tabName = k
-			tab:SetScript("OnClick", function(self)
-				ODC:SetActiveTab(self.tabName)
-			end)
-			
-			tab.name = name
-			tab.tooltip = ODC.Tabs[k].Tooltip
+
 			tab:Show()
+			tabIndex = tabIndex + 1
 		end
-	end
+	end	
 end
 
 function ODC:CreatePopupFrame()
@@ -284,7 +304,7 @@ local OfflineDataCenterPopMenu = {}
 
 local function AddPopMenu(tabName, tabTooltip)
 	local t = {text = tabTooltip,
-		func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab(tabName, true) end},
+		func = function() PlaySound("igMainMenuOpen"); ODC:SetActiveTab(tabName, true) end,}
 	tinsert(OfflineDataCenterPopMenu, t)
 end
 
@@ -360,8 +380,8 @@ local function DropDown(list, frame, xOffset, yOffset)
 	x = x/UIScale
 	y = y/UIScale
 	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x + xOffset, y + yOffset)	
-
+	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x + xOffset, y + yOffset)
+	
 	ToggleFrame(frame)
 end
 
@@ -397,6 +417,7 @@ local function CreateElvUIBagToggleButton(name, parent)
 	f:SetScript("OnLeave", function(self)
 		GameTooltip:Hide()
 	end)
+	--f.name = name
 	return f
 end
 
@@ -407,7 +428,7 @@ local function CreateToggleButton(f)
 		return;
 	end
 	
-	if f:GetName() == 'ContainerFrame1' and not ContainerFrame1PortraitButton.dropdownmenu then
+	if f:GetName() == 'ContainerFrame1' then-- and not ContainerFrame1PortraitButton.dropdownmenu
 		ContainerFrame1PortraitButton:RegisterForClicks('AnyUp', 'AnyDown')
 		ContainerFrame1PortraitButton:EnableMouse(true)
 		ContainerFrame1PortraitButton:SetScript("OnClick", function(self)
@@ -427,28 +448,37 @@ local function CreateToggleButton(f)
 		return ContainerFrame1PortraitButton
 	end
 
-	if ElvUI then --and not f.offlineButton
+	if f:GetName() == "ElvUI_ContainerFrame" then --ElvUI and not f.offlineButton
 		if f.offlineButton then
-			for k, v in pairs(f.offlineButton) do
-				v:Hide()
-				v = nil
+			for tabName, button in pairs(f.offlineButton) do
+				button:Hide()
+				button.enable = false
+				button:ClearAllPoints()
 			end
+		else
+			f.offlineButton = {}
 		end
-		f.offlineButton = {}
+		
 		--offline button
 		for tabName, v in pairs(ODC.Tabs) do
-			tinsert(f.offlineButton, CreateElvUIBagToggleButton(tabName, f))
+			if not f.offlineButton[tabName] then
+				f.offlineButton[tabName] = CreateElvUIBagToggleButton(tabName, f)
+			end
+			f.offlineButton[tabName].enable = true
 		end
 
-		if #f.offlineButton > 0 then
-			for i = 1, #f.offlineButton do
-				if i == 1 then
-					f.offlineButton[i]:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
+		local lastButton
+		for tabName, button in pairs(f.offlineButton) do
+			if button.enable then
+				if not lastButton then
+					button:Point('TOPLEFT', f, 'TOPLEFT', 8, -20)
 				else
-					f.offlineButton[i]:Point("LEFT", f.offlineButton[i-1], "RIGHT", 6, 0)
+					button:Point("LEFT", lastButton, "RIGHT", 6, 0)
 				end
+				button:Show()
+				lastButton = button
 			end
-		end		
+		end	
 	end
 	
 	return f
@@ -468,24 +498,23 @@ function ODC:AddTab(tabName, tab)
 	self.Tabs[tabName] = tab
 	AddPopMenu(tabName, tab.Tooltip)
 	CreateFrameTab(self.Frame)
+	self:OpenBags()
 end
 
 function ODC:RemoveTab(tabName)
+	if not self.Tabs[tabName] then return end
+	RemovePopMenu(self.Tabs[tabName].Tooltip)
+	if self.selectTab == tabName then
+		self:SetActiveTab()
+		self.Tabs[tabName].subFrame:Hide();
+	end
 	self.Tabs[tabName] = nil
-	RemovePopMenu(tabName)
 	CreateFrameTab(self.Frame)
+	self:OpenBags()
 end
 
 function ODC:AddAvaliableTab(tabName, module)
 	self.TabsAvaliable[tabName] = module
-end
-
-local function PrintCmdHelper()
-	print("Unknow ODC command! ODC command helper:\n"..
-	"/ODC toggle: to toggle ODC window\n"..
-	"/ODC enable [tab name]: to enable [tab name]\n"..
-	"/ODC disable [tab name]: to disable [tab name]\n"..
-	"/ODC state: to show tabs state\n")
 end
 
 function ODC:FrameShow()
@@ -501,6 +530,7 @@ function ODC:FrameHide()
 end
 
 function ODC:ToggleWindow()
+	
 	if self.Frame:IsVisible() then
 		self:FrameHide()
 	else
@@ -509,12 +539,20 @@ function ODC:ToggleWindow()
 	end
 end
 
+local function PrintCmdHelper()
+	print("|cffffff33Unknow ODC command! ODC command helper:|r\n"..
+	"|cff33ff33/ODC toggle|r: to toggle ODC window\n"..
+	"|cff33ff33/ODC enable [tab name]|r: to enable |cffffff33[tab name]|r\n"..
+	"|cff33ff33/ODC disable [tab name]|r: to disable |cffffff33[tab name]|r\n"..
+	"|cff33ff33/ODC state|r: to show tabs state\n")
+end
+
 local function PrintTabState()
 	for k, v in pairs(ODC_Config.toggle) do
 		if v then
-			print(k.." is enabled")
+			print(k.." is |cff33ff33enabled|r")
 		else
-			print(k.." is disabled")
+			print(k.." is |cffff3333disabled|r")
 		end
 	end
 end

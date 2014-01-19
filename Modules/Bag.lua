@@ -148,8 +148,7 @@ function ODC_Bag:OnDisable()
 	end
 	if not ODC_Config.toggle.bag and not ODC_Config.toggle.bank then
 		ODC:RemoveModule(self)
-		self:UnhookAll()
-		-- self:UnregisterEvent("BAG_UPDATE_DELAYED")
+		self:UnregisterEvent("BAG_UPDATE_DELAYED")
 	end
 	-- ODC_Config.toggle.bag = false
 	-- ODC_Config.toggle.bank = false
